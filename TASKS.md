@@ -36,7 +36,7 @@
 - [ ] Order/acquire MAX31855 thermocouple amplifier breakout
 - [ ] Order/acquire K-type thermocouple (high-temp rated)
 - [ ] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
-- [ ] Order/acquire rotary encoder module (5V, 20 pulses/revolution, with push button)
+- [ ] Order/acquire TWO rotary encoder modules (5V, 20 pulses/revolution, with push button each)
 - [ ] Order/acquire tactile push buttons (2-3)
 - [ ] Order/acquire piezo buzzer
 - [ ] Order/acquire LEDs and resistors
@@ -89,20 +89,31 @@
 - [ ] Implement screen refresh logic (250ms)
 - [ ] Handle display errors gracefully
 
-### 1.6 Rotary Encoder Input
-- [ ] Wire rotary encoder (5V to ESP32 5V, GND to GND, CLK to GPIO32, DT to GPIO33, SW to GPIO34)
-- [ ] Implement encoder interrupt handlers
-- [ ] Test clockwise rotation detection
-- [ ] Test counter-clockwise rotation detection
-- [ ] Test push button detection
-- [ ] Add debouncing logic for encoder
-- [ ] Add debouncing logic for button
-- [ ] Create simple value adjustment test (increment/decrement)
+### 1.6 Dual Rotary Encoder Input
+**Left Encoder** (Navigation/Time Axis):
+- [ ] Wire left encoder (5V to ESP32 5V, GND to GND, CLK to GPIO32, DT to GPIO33, SW to GPIO34)
+- [ ] Implement left encoder interrupt handlers
+- [ ] Test left encoder clockwise/counter-clockwise detection
+- [ ] Test left encoder push button detection
+- [ ] Add debouncing logic for left encoder
+
+**Right Encoder** (Values/Temperature Axis):
+- [ ] Wire right encoder (5V to ESP32 5V, GND to GND, CLK to GPIO35, DT to GPIO39, SW to GPIO36)
+- [ ] Implement right encoder interrupt handlers
+- [ ] Test right encoder clockwise/counter-clockwise detection
+- [ ] Test right encoder push button detection
+- [ ] Add debouncing logic for right encoder
+
+**Dual Encoder Integration**:
+- [ ] Create dual-encoder test (simultaneous rotation detection)
+- [ ] Implement independent event handlers for each encoder
 - [ ] Test encoder responsiveness at different speeds
+- [ ] Test simultaneous operation (both encoders turning at once)
+- [ ] Document encoder roles (left=nav/time, right=value/temp)
 
 ### 1.7 Integration Testing
 - [ ] Display live temperature on LCD
-- [ ] Use rotary encoder to adjust target temperature setpoint
+- [ ] Use dual encoders: left for mode selection, right for setpoint adjustment
 - [ ] Display both current and target temperature
 - [ ] Manually control SSR based on setpoint (on/off control)
 - [ ] Add status LED indicating heating/idle
@@ -190,7 +201,7 @@
 ### 2.6 Menu System Development
 - [ ] Design menu structure (state machine)
 - [ ] Create menu item data structure
-- [ ] Implement menu navigation with rotary encoder
+- [ ] Implement menu navigation with dual encoders (left=scroll, right=adjust values)
 - [ ] Create main menu screen
   - [ ] View Current Status
   - [ ] Set Temperature

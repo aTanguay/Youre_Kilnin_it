@@ -177,14 +177,24 @@ Storage (Current/Billing/Annual/Lifetime)
   - 20x4 Character LCD: Character-only (no graphs), limited flexibility
   - TFT Color Display: Higher cost, unnecessary for application
 
-**User Input**: Rotary Encoder + Push Buttons
-- **Specifications**: 5V rotary encoder, 20 pulses per revolution (detents)
-- **Pins**: CLK (Pin A), DT (Pin B), SW (select switch), + (5V), GND
-- **Why**: Intuitive navigation, precise adjustment, satisfying tactile feedback
+**User Input**: Dual Rotary Encoders
+- **Specifications**: Two 5V rotary encoders, 20 pulses per revolution each (detents)
+- **Pins per encoder**: CLK (Pin A), DT (Pin B), SW (select switch), + (5V), GND
+- **Why Dual Encoders**:
+  - **Intuitive profile editing**: Direct manipulation of both time (X-axis) and temperature (Y-axis) simultaneously
+  - **Improved UX**: Left encoder for navigation/time, right encoder for values/temperature
+  - **Menu efficiency**: Two-axis control for complex parameter adjustment
+  - **Professional feel**: Similar to audio mixing consoles, synthesizers
+  - **Tactile feedback**: Physical encoders more satisfying than single encoder + buttons
 - **Voltage Consideration**: 5V output is safe for ESP32 3.3V GPIO (high-impedance inputs tolerate 5V)
+- **Use Cases**:
+  - **Profile Editor**: Left = segment time, Right = target temperature
+  - **Menu Navigation**: Left = scroll items, Right = adjust values
+  - **Live Control**: Left = navigate modes, Right = adjust setpoint
 - **Alternatives Considered**:
+  - Single encoder + buttons: Less intuitive for 2D editing (time + temp profiles)
   - Touchscreen: More expensive, less reliable in dusty studio environment
-  - Button Matrix: More buttons needed, less elegant
+  - Button Matrix: Many buttons needed, less elegant
 
 ### Software Stack
 
@@ -255,8 +265,8 @@ Storage (Current/Billing/Annual/Lifetime)
 - [ ] MAX31855 Thermocouple Amplifier breakout board
 - [ ] K-Type thermocouple (high-temp rated)
 - [ ] 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
-- [ ] Rotary encoder module (5V, 20 pulses/revolution, with push button)
-- [ ] Tactile push buttons (2-3)
+- [ ] Two rotary encoder modules (5V, 20 pulses/revolution, with push button each)
+- [ ] Tactile push button (1) - for emergency stop if needed
 - [ ] Piezo buzzer
 - [ ] LEDs (3-5) and 220Ω resistors
 - [ ] Solid State Relay (40A, zero-cross) + heat sink
@@ -679,6 +689,19 @@ After applying offset:
 - **Context**: User request for energy cost monitoring
 - **Decision**: Implement comprehensive cost tracking (current firing, billing cycle, annual, lifetime)
 - **Rationale**: Valuable feature for users, no additional hardware required (uses SSR duty cycle)
+- **Status**: Approved
+
+**Decision 006**: Dual Rotary Encoders
+- **Date**: 2025-10-13
+- **Context**: User interface design for profile editing and menu navigation
+- **Decision**: Use two rotary encoders instead of single encoder + button
+- **Rationale**:
+  - Intuitive 2D control for firing profile editing (time X-axis, temperature Y-axis)
+  - Direct manipulation feels more natural than sequential adjustment
+  - Professional UX similar to audio/synth equipment
+  - Left encoder: navigation/time, Right encoder: values/temperature
+  - More engaging tactile experience
+  - Minimal cost increase (~$3 for second encoder)
 - **Status**: Approved
 
 ### Open Questions

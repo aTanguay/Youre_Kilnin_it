@@ -56,18 +56,19 @@ lib_deps =
 | MAX31855 (Thermocouple) | SPI | CS: 5, CLK: 18, MISO: 19 | K-type thermocouple amplifier |
 | SSR Control | GPIO Output | GPIO 25 | PWM/digital control, optoisolated |
 | LCD Display (ST7920) | SPI | CS: 15, MOSI: 23, SCK: 18 | 128x64 dots, blue backlight |
-| Rotary Encoder | GPIO Input | CLK: 32, DT: 33, SW: 34 | 5V module, 20 pulses/rev, with push button |
-| Secondary Button | GPIO Input | GPIO 35 | Additional user input |
-| Emergency Stop | GPIO Input | GPIO 36 (VP) | NC switch, pull-up enabled |
+| Rotary Encoder (Left) | GPIO Input | CLK: 32, DT: 33, SW: 34 | 5V module, 20 pulses/rev, navigation/time |
+| Rotary Encoder (Right) | GPIO Input | CLK: 35, DT: 39, SW: 36 | 5V module, 20 pulses/rev, values/temp |
+| Emergency Stop | GPIO Input | GPIO 13 | NC switch, pull-up enabled |
 | Piezo Buzzer | GPIO Output | GPIO 26 | Audio feedback |
 | Status LEDs | GPIO Output | Power: 27, WiFi: 14, Error: 12 | Optional indicators |
 
 **Important**:
-- GPIOs 34-39 are input-only (no pull-up/pull-down)
+- GPIOs 34-39 are input-only (no pull-up/pull-down) - used for right encoder
 - Avoid GPIOs 0, 2 (boot strapping - GPIO 5, 12, 15 used strategically for SPI)
 - LCD and MAX31855 share SPI bus (SCK on GPIO 18)
 - Different CS pins allow independent device control
-- Rotary encoder is 5V module - ESP32 GPIO inputs are 5V tolerant (high-impedance)
+- Both rotary encoders are 5V modules - ESP32 GPIO inputs are 5V tolerant (high-impedance)
+- Dual encoders enable simultaneous X/Y control for intuitive profile editing
 
 ### Electrical Isolation
 

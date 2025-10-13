@@ -22,17 +22,22 @@
 #define LCD_MOSI_PIN        23  // MOSI (Data)
 #define LCD_SCK_PIN         18  // SCK (Clock) - shared with MAX31855
 
-// Rotary Encoder (5V module - 20 pulses per revolution)
+// Dual Rotary Encoders (5V modules - 20 pulses per revolution each)
 // Note: 5V encoder output is safe for ESP32 3.3V GPIO (high-impedance inputs)
-#define ENCODER_CLK_PIN     32  // Encoder Pin A
-#define ENCODER_DT_PIN      33  // Encoder Pin B
-#define ENCODER_SW_PIN      34  // Select switch (input-only pin)
+// Usage: Left encoder for navigation/X-axis (time), Right encoder for values/Y-axis (temp)
 
-// Additional Buttons
-#define BUTTON_SECONDARY    35  // Input-only pin
+// Left Encoder - Primary navigation and time axis control
+#define ENCODER_LEFT_CLK_PIN    32  // Left Encoder Pin A
+#define ENCODER_LEFT_DT_PIN     33  // Left Encoder Pin B
+#define ENCODER_LEFT_SW_PIN     34  // Left select switch (input-only pin)
+
+// Right Encoder - Value adjustment and temperature axis control
+#define ENCODER_RIGHT_CLK_PIN   35  // Right Encoder Pin A (input-only pin)
+#define ENCODER_RIGHT_DT_PIN    39  // Right Encoder Pin B (input-only pin, VN)
+#define ENCODER_RIGHT_SW_PIN    36  // Right select switch (input-only pin, VP)
 
 // Emergency Stop (NC switch)
-#define EMERGENCY_STOP_PIN  36  // Input-only pin (VP)
+#define EMERGENCY_STOP_PIN  13  // Changed from GPIO 36 (now used for right encoder)
 
 // Piezo Buzzer
 #define BUZZER_PIN          26
