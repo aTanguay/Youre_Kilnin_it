@@ -404,6 +404,335 @@ void updateSSR(float pidOutput) {
 
 **Note**: Use non-blocking timing in actual implementation!
 
+## Thermocouple Calibration
+
+### Overview
+
+**CRITICAL**: Thermocouple calibration must be completed before PID auto-tuning. Accurate temperature measurement is essential for kiln control.
+
+K-type thermocouples can have offset errors due to:
+- Manufacturing tolerances
+- Connection resistance at junction points
+- Wire quality variations
+- Cold junction compensation drift
+
+### Ice-Point Calibration Method
+
+**Reference Temperature**: 0°C (32°F) using ice-water bath
+**Accuracy**: ±0.1°C when properly prepared
+**Standard**: NIST calibration laboratories use this method
+
+### Implementation Requirements
+
+**Calibration Data Structure**:
+```cpp
+struct CalibrationData {
+    float offset;                // Calculated offset in °C
+    unsigned long calibDate;     // Unix timestamp of calibration
+    bool isCalibrated;           // Calibration status flag
+    uint8_t sampleCount;         // Number of stable readings used
+};
+```
+
+**Storage in NVS**:
+```cpp
+// Save calibration data
+Preferences prefs;
+prefs.begin("kiln-config", false);
+prefs.putFloat("temp_offset", calibrationOffset);
+prefs.putULong("calib_date", now());
+prefs.putBool("is_calibrated", true);
+prefs.end();
+
+// Load calibration data
+prefs.begin("kiln-config", true); // read-only
+float offset = prefs.getFloat("temp_offset", 0.0);
+bool calibrated = prefs.getBool("is_calibrated", false);
+unsigned long calibDate = prefs.getULong("calib_date", 0);
+prefs.end();
+```
+
+**Apply Calibration to Readings**:
+```cpp
+float readCalibratedTemperature() {
+    float rawTemp = max31855.readCelsius();
+
+    // Validate reading
+    if (isnan(rawTemp) || !isValidTemperature(rawTemp)) {
+        return TEMP_ERROR_VALUE;
+    }
+
+    // Apply calibration offset
+    float calibratedTemp = rawTemp + calibrationData.offset;
+
+    return calibratedTemp;
+}
+```
+
+### Stability Detection for Calibration
+
+**Requirements**:
+- Temperature must be stable within ±0.5°C for 60 seconds
+- Minimum 10 consecutive readings within tolerance
+- Visual feedback during stabilization
+
+**Implementation**:
+```cpp
+bool isTemperatureStable(float currentTemp) {
+    static float readings[10] = {0};
+    static uint8_t readingIndex = 0;
+    static unsigned long stableStartTime = 0;
+
+    // Add reading to circular buffer
+    readings[readingIndex] = currentTemp;
+    readingIndex = (readingIndex + 1) % 10;
+
+    // Calculate min/max range
+    float minTemp = readings[0];
+    float maxTemp = readings[0];
+    for (int i = 1; i < 10; i++) {
+        if (readings[i] < minTemp) minTemp = readings[i];
+        if (readings[i] > maxTemp) maxTemp = readings[i];
+    }
+
+    float range = maxTemp - minTemp;
+
+    // Check if within tolerance
+    if (range <= 0.5) {
+        if (stableStartTime == 0) {
+            stableStartTime = millis();
+        }
+
+        // Check if stable for required duration
+        if (millis() - stableStartTime >= 60000) {
+            return true;
+        }
+    } else {
+        stableStartTime = 0;
+    }
+
+    return false;
+}
+```
+
+### Calibration Mode UI Flow
+
+**LCD Display Sequence**:
+
+1. **Instructions Screen**:
+```
+┌──────────────────────┐
+│ THERMOCOUPLE CAL     │
+├──────────────────────┤
+│ Prepare ice bath:    │
+│ 1. Fill with crushed │
+│    ice (50-60%)      │
+│ 2. Add water to cover│
+│ 3. Stir 30 seconds   │
+│ 4. Insert probe 3"   │
+│                      │
+│ [Start] [Cancel]     │
+└──────────────────────┘
+```
+
+2. **Stabilization Screen**:
+```
+┌──────────────────────┐
+│ CALIBRATION MODE     │
+├──────────────────────┤
+│ Waiting for stable   │
+│ reading at 0.0°C...  │
+│                      │
+│ Current: 1.8°C       │
+│ Samples: 23          │
+│ Stable: No [░░░░░   ]│
+│                      │
+│ [Cancel]             │
+└──────────────────────┘
+```
+
+3. **Confirmation Screen**:
+```
+┌──────────────────────┐
+│ CALIBRATION RESULT   │
+├──────────────────────┤
+│ Expected: 0.0°C      │
+│ Measured: 1.8°C      │
+│ Offset: -1.8°C       │
+│                      │
+│ Quality: Excellent   │
+│                      │
+│ [Accept] [Retry]     │
+└──────────────────────┘
+```
+
+### Calibration Quality Assessment
+
+```cpp
+String assessCalibrationQuality(float offset) {
+    float absOffset = abs(offset);
+
+    if (absOffset <= 0.5) return "Excellent";
+    if (absOffset <= 1.0) return "Good";
+    if (absOffset <= 2.0) return "Acceptable";
+    if (absOffset <= 5.0) return "Poor";
+    return "Failed";
+}
+```
+
+**Quality Thresholds**:
+- **Excellent**: ±0.5°C or better
+- **Good**: ±1.0°C
+- **Acceptable**: ±2.0°C
+- **Poor**: ±5.0°C (check connections)
+- **Failed**: >±5.0°C (investigate wiring, thermocouple damage)
+
+### Calibration Status Display
+
+**Main Status Screen** should show:
+```cpp
+// Display calibration status icon
+if (calibrationData.isCalibrated) {
+    display.print("✓CAL");  // Calibrated
+} else {
+    display.print("!CAL");  // Not calibrated - warning
+}
+```
+
+**System Info Menu** should show:
+- Last calibration date
+- Calibration offset value
+- Time since last calibration
+- Warning if > 365 days old
+
+### When to Recalibrate
+
+**Mandatory**:
+- Initial setup (before first use)
+- After replacing thermocouple
+- After modifying thermocouple wiring
+- Before PID auto-tune
+
+**Recommended**:
+- Annually (every 365 days)
+- If temperature readings seem inaccurate
+- After suspected thermocouple damage
+- After any kiln rewiring
+
+### API Endpoints for Calibration
+
+**REST API**:
+```
+GET  /api/calibration        - Get calibration status and data
+POST /api/calibration/start  - Initiate calibration mode
+POST /api/calibration/save   - Save calculated offset
+POST /api/calibration/reset  - Clear calibration data
+```
+
+**WebSocket Messages**:
+```json
+{
+  "type": "calibration_status",
+  "currentTemp": 1.8,
+  "sampleCount": 23,
+  "isStable": false,
+  "stableProgress": 38
+}
+```
+
+### Safety Considerations
+
+**During Calibration**:
+- SSR must be OFF (kiln not heating)
+- System state must be IDLE
+- Cannot start firing without calibration
+- Calibration can be aborted at any time
+
+**Validation**:
+```cpp
+bool canStartCalibration() {
+    // Must be in IDLE state
+    if (kilnState.state != STATE_IDLE) {
+        return false;
+    }
+
+    // SSR must be off
+    if (digitalRead(SSR_PIN) == HIGH) {
+        return false;
+    }
+
+    // Thermocouple must be functional
+    float temp = max31855.readCelsius();
+    if (isnan(temp)) {
+        return false;
+    }
+
+    return true;
+}
+```
+
+### Example Calibration Module (src/temperature/calibration.cpp)
+
+```cpp
+class ThermocoupleCalibration {
+private:
+    CalibrationData data;
+    Preferences prefs;
+
+    bool stabilityDetected;
+    float stableTemperature;
+
+public:
+    void begin() {
+        loadFromNVS();
+    }
+
+    void loadFromNVS() {
+        prefs.begin("kiln-config", true);
+        data.offset = prefs.getFloat("temp_offset", 0.0);
+        data.calibDate = prefs.getULong("calib_date", 0);
+        data.isCalibrated = prefs.getBool("is_calibrated", false);
+        prefs.end();
+    }
+
+    void saveToNVS() {
+        prefs.begin("kiln-config", false);
+        prefs.putFloat("temp_offset", data.offset);
+        prefs.putULong("calib_date", now());
+        prefs.putBool("is_calibrated", true);
+        prefs.end();
+    }
+
+    float applyCalibration(float rawTemp) {
+        return rawTemp + data.offset;
+    }
+
+    void calculateOffset(float measuredTemp) {
+        // Ice point expected = 0.0°C
+        data.offset = 0.0 - measuredTemp;
+        data.calibDate = now();
+        data.isCalibrated = true;
+    }
+
+    bool isCalibrated() {
+        return data.isCalibrated;
+    }
+
+    String getCalibrationAge() {
+        if (!data.isCalibrated) return "Never";
+
+        unsigned long age = now() - data.calibDate;
+        uint16_t days = age / 86400;
+
+        if (days == 0) return "Today";
+        if (days == 1) return "Yesterday";
+        if (days < 30) return String(days) + " days ago";
+        if (days < 365) return String(days/30) + " months ago";
+        return String(days/365) + " years ago";
+    }
+};
+```
+
 ## Web Interface Guidelines
 
 ### API Endpoints
