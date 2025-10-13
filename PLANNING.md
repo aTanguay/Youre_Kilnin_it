@@ -47,7 +47,7 @@ Democratize professional-grade kiln control by creating an affordable, open-sour
 ┌─────────────────────────────────────────────────────────────┐
 │                        USER INTERFACES                       │
 ├──────────────┬──────────────────┬──────────────────────────┤
-│ Local OLED   │  Web Dashboard   │  Mobile Browser          │
+│ Local LCD    │  Web Dashboard   │  Mobile Browser          │
 │ + Rotary Enc │  (WiFi)          │  (Responsive)            │
 └──────────────┴──────────────────┴──────────────────────────┘
                             ▲
@@ -74,7 +74,7 @@ Democratize professional-grade kiln control by creating an affordable, open-sour
 │  │              HARDWARE ABSTRACTION LAYER              │ │
 │  ├──────────────┬──────────────┬──────────────────────┬─┤ │
 │  │ Thermocouple │ SSR Control  │ Display Driver       │ │ │
-│  │ (SPI)        │ (GPIO PWM)   │ (I2C)                │ │ │
+│  │ (SPI)        │ (GPIO PWM)   │ (SPI - ST7920)       │ │ │
 │  ├──────────────┼──────────────┼──────────────────────┼─┤ │
 │  │ Rotary Enc   │ Buttons      │ Buzzer               │ │ │
 │  │ (GPIO Int)   │ (GPIO Int)   │ (GPIO PWM)           │ │ │
@@ -138,7 +138,7 @@ Storage (Current/Billing/Annual/Lifetime)
 | SPIFFS vs LittleFS | LittleFS more robust, faster | May need partition table adjustment |
 | Single Thermocouple | Adequate for small kilns, simpler | Multi-zone kilns need upgrade path |
 | SSR vs Mechanical Relay | Silent, long-lasting, no arcing | Requires heat sinking |
-| OLED vs LCD | High contrast, modern look, no backlight issues | Slightly more expensive (~$2) |
+| ST7920 LCD vs OLED | Larger size, lower cost, better visibility | Slightly higher power consumption |
 | JSON Profiles | Human-readable, standard format | Larger file size vs binary |
 
 ## Technology Stack
@@ -164,10 +164,17 @@ Storage (Current/Billing/Annual/Lifetime)
   - Mechanical Relay: Noisy, limited lifespan, contact arcing
   - TRIAC Circuit: More complex, safety concerns with DIY builds
 
-**Display**: 128x64 OLED (SSD1306, I2C)
-- **Why**: High contrast, low power, graphics capability, modern aesthetic
+**Display**: 128x64 LCD Graphic Module (ST7920, SPI)
+- **Why**: Larger physical size (better visibility), lower cost than OLED, full graphics capability with blue backlight, proven reliability
+- **Advantages**:
+  - Bigger display area improves readability in studio environment
+  - Lower cost (~$5-8 vs $10-12 for OLED)
+  - Blue backlight provides excellent contrast
+  - Widely available from multiple suppliers
+  - Full graphics mode (128x64 dots) supports charts and custom layouts
 - **Alternatives Considered**:
-  - 20x4 LCD: Character-only (no graphs), requires backlight
+  - 128x64 OLED (SSD1306): Smaller, higher cost, but lower power
+  - 20x4 Character LCD: Character-only (no graphs), limited flexibility
   - TFT Color Display: Higher cost, unnecessary for application
 
 **User Input**: Rotary Encoder + Push Buttons
@@ -202,7 +209,7 @@ Storage (Current/Billing/Annual/Lifetime)
 | ArduinoJson | Profile/config storage | De facto standard, well-tested, efficient |
 | Adafruit MAX31855 | Thermocouple interface | Industry standard, reliable, well-documented |
 | PID_v1 (br3ttb) | Temperature control | Proven PID implementation with auto-tune support |
-| U8g2 | OLED graphics | Universal, excellent font support, optimized |
+| U8g2 | ST7920 LCD graphics | Universal graphics library, supports ST7920 SPI, excellent fonts |
 | Preferences | Settings storage | ESP32 NVS wrapper, simple key-value store |
 
 **Web Technologies**
@@ -244,7 +251,7 @@ Storage (Current/Billing/Annual/Lifetime)
 - [ ] Breadboard and jumper wires
 - [ ] MAX31855 Thermocouple Amplifier breakout board
 - [ ] K-Type thermocouple (high-temp rated)
-- [ ] 128x64 OLED display (SSD1306, I2C)
+- [ ] 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
 - [ ] Rotary encoder with push button
 - [ ] Tactile push buttons (2-3)
 - [ ] Piezo buzzer
@@ -362,7 +369,7 @@ lib_deps =
 - [ ] Breadboard ESP32 + MAX31855 + thermocouple
 - [ ] Test temperature reading accuracy
 - [ ] Implement basic SSR control (on/off)
-- [ ] Display temperature on OLED
+- [ ] Display temperature on 12864 LCD (ST7920)
 - [ ] Verify rotary encoder input
 
 **Deliverable**: Working breadboard prototype reading temperature and controlling SSR
@@ -483,11 +490,17 @@ lib_deps =
 - **Rationale**: Lower EMI, less interference with thermocouple readings
 - **Status**: Approved
 
-**Decision 003**: OLED vs Character LCD
-- **Date**: 2025-10-11
-- **Context**: Display capabilities vs cost
-- **Decision**: 128x64 OLED (SSD1306) as primary, LCD as alternative
-- **Rationale**: Graphing capability improves user experience, minimal cost difference
+**Decision 003**: Display Selection - ST7920 LCD vs OLED
+- **Date**: 2025-10-11 (Updated: 2025-10-11)
+- **Context**: Display capabilities, cost, and visibility requirements
+- **Decision**: 12864 LCD Module with ST7920 controller (SPI) as primary display
+- **Rationale**:
+  - Larger physical size improves readability in studio environment
+  - Lower cost (~$5-8 vs $10-12 for OLED)
+  - Full graphics mode (128x64 dots) supports temperature graphs and custom UI
+  - Blue backlight provides excellent visibility
+  - U8g2 library provides excellent ST7920 support
+  - More cost-effective without sacrificing functionality
 - **Status**: Approved
 
 **Decision 004**: PlatformIO vs Arduino IDE
