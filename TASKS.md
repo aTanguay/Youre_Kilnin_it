@@ -36,7 +36,7 @@
 - [ ] Order/acquire MAX31855 thermocouple amplifier breakout
 - [ ] Order/acquire K-type thermocouple (high-temp rated)
 - [ ] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
-- [ ] Order/acquire rotary encoder with push button
+- [ ] Order/acquire rotary encoder module (5V, 20 pulses/revolution, with push button)
 - [ ] Order/acquire tactile push buttons (2-3)
 - [ ] Order/acquire piezo buzzer
 - [ ] Order/acquire LEDs and resistors
@@ -90,7 +90,7 @@
 - [ ] Handle display errors gracefully
 
 ### 1.6 Rotary Encoder Input
-- [ ] Wire rotary encoder (CLK=32, DT=33, SW=34)
+- [ ] Wire rotary encoder (5V to ESP32 5V, GND to GND, CLK to GPIO32, DT to GPIO33, SW to GPIO34)
 - [ ] Implement encoder interrupt handlers
 - [ ] Test clockwise rotation detection
 - [ ] Test counter-clockwise rotation detection

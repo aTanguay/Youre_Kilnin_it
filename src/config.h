@@ -22,10 +22,11 @@
 #define LCD_MOSI_PIN        23  // MOSI (Data)
 #define LCD_SCK_PIN         18  // SCK (Clock) - shared with MAX31855
 
-// Rotary Encoder
-#define ENCODER_CLK_PIN     32
-#define ENCODER_DT_PIN      33
-#define ENCODER_SW_PIN      34  // Input-only pin
+// Rotary Encoder (5V module - 20 pulses per revolution)
+// Note: 5V encoder output is safe for ESP32 3.3V GPIO (high-impedance inputs)
+#define ENCODER_CLK_PIN     32  // Encoder Pin A
+#define ENCODER_DT_PIN      33  // Encoder Pin B
+#define ENCODER_SW_PIN      34  // Select switch (input-only pin)
 
 // Additional Buttons
 #define BUTTON_SECONDARY    35  // Input-only pin
@@ -72,6 +73,9 @@
 #define DISPLAY_UPDATE_INTERVAL_MS  250   // Display update every 250ms
 #define INPUT_CHECK_INTERVAL_MS     50    // Input check every 50ms
 #define ENERGY_UPDATE_INTERVAL_MS   1000  // Energy tracking every 1 second
+
+// Rotary Encoder
+#define ENCODER_PULSES_PER_REV      20    // Detents per full rotation
 
 // Display
 #define LCD_WIDTH           128

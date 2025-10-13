@@ -178,7 +178,10 @@ Storage (Current/Billing/Annual/Lifetime)
   - TFT Color Display: Higher cost, unnecessary for application
 
 **User Input**: Rotary Encoder + Push Buttons
+- **Specifications**: 5V rotary encoder, 20 pulses per revolution (detents)
+- **Pins**: CLK (Pin A), DT (Pin B), SW (select switch), + (5V), GND
 - **Why**: Intuitive navigation, precise adjustment, satisfying tactile feedback
+- **Voltage Consideration**: 5V output is safe for ESP32 3.3V GPIO (high-impedance inputs tolerate 5V)
 - **Alternatives Considered**:
   - Touchscreen: More expensive, less reliable in dusty studio environment
   - Button Matrix: More buttons needed, less elegant
@@ -252,7 +255,7 @@ Storage (Current/Billing/Annual/Lifetime)
 - [ ] MAX31855 Thermocouple Amplifier breakout board
 - [ ] K-Type thermocouple (high-temp rated)
 - [ ] 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
-- [ ] Rotary encoder with push button
+- [ ] Rotary encoder module (5V, 20 pulses/revolution, with push button)
 - [ ] Tactile push buttons (2-3)
 - [ ] Piezo buzzer
 - [ ] LEDs (3-5) and 220Ω resistors
@@ -360,19 +363,176 @@ lib_deps =
 2. Click PlatformIO Upload button
 3. Verify successful compilation and upload
 
+## Thermocouple Calibration Procedure
+
+### Overview
+
+Accurate temperature measurement is critical for kiln control. K-type thermocouples and their associated wiring can introduce measurement errors due to:
+- Manufacturing tolerances in the thermocouple
+- Connection resistance at junction points
+- Wire quality variations
+- Cold junction compensation errors
+
+**The ice-point calibration method** provides a simple, accurate way to determine the offset error at 0°C (32°F), which can then be applied across the entire temperature range.
+
+### Why Ice-Point Calibration?
+
+- **Known Reference**: Ice water at 0°C provides a stable, easily reproducible reference point
+- **Simple Setup**: Requires only ice, water, and an insulated container
+- **Accurate**: Properly prepared ice bath is accurate to ±0.1°C
+- **Industry Standard**: Used by NIST and calibration laboratories worldwide
+
+### Required Materials
+
+- [ ] Crushed ice (not cubes - crushed ice packs better)
+- [ ] Distilled water (tap water acceptable for ±0.5°C accuracy)
+- [ ] Insulated container (thermos, cooler, or styrofoam cup)
+- [ ] Thermometer (optional, for verification)
+- [ ] The assembled kiln controller with thermocouple
+
+### Ice Bath Preparation Procedure
+
+**Step 1: Prepare the Ice Bath**
+1. Fill insulated container 50-60% with crushed ice
+2. Add just enough distilled water to cover the ice (ice should float slightly)
+3. Stir vigorously for 30 seconds to ensure thermal equilibrium
+4. Let settle for 1-2 minutes
+5. Result: Ice-water slush at exactly 0.0°C (32.0°F)
+
+**Important Notes**:
+- Too much water: Temperature will be above 0°C
+- Too little water: Poor thermal contact with thermocouple
+- Ice must be floating, not packed solid at bottom
+- Air temperature does NOT affect ice-water temperature (it stays at 0°C)
+
+**Step 2: Insert Thermocouple**
+1. Insert thermocouple tip at least 3-4 inches into ice bath
+2. Ensure tip is surrounded by ice-water slush, not touching container walls
+3. Gently stir around thermocouple to eliminate air pockets
+4. Wait 2-3 minutes for thermal stabilization
+
+**Step 3: Record Reading**
+1. Power on kiln controller
+2. Wait for temperature reading to stabilize (30-60 seconds)
+3. Record the displayed temperature
+4. Repeat reading 3 times to ensure consistency
+5. Calculate average if readings vary
+
+### Calibration Offset Calculation
+
+**Expected Reading**: 0.0°C (32.0°F)
+**Actual Reading**: [What controller displays]
+**Calibration Offset** = Expected - Actual
+
+**Examples**:
+- Controller reads 2.5°C → Offset = 0 - 2.5 = -2.5°C
+- Controller reads -1.0°C → Offset = 0 - (-1.0) = +1.0°C
+- Controller reads 0.3°C → Offset = 0 - 0.3 = -0.3°C
+
+**Applying the Offset**:
+```cpp
+float correctedTemp = rawTemp + calibrationOffset;
+```
+
+### Acceptable Tolerance
+
+- **Excellent**: ±0.5°C or better
+- **Good**: ±1.0°C
+- **Acceptable**: ±2.0°C
+- **Poor**: >±2.0°C (check connections, thermocouple quality)
+
+If error is >±5°C, check for:
+- Loose or corroded connections
+- Damaged thermocouple wire
+- MAX31855 wiring errors
+- Cold junction compensation issues
+
+### Storage in Firmware
+
+The calibration offset should be stored in non-volatile storage (NVS/Preferences):
+
+```cpp
+// During calibration
+Preferences prefs;
+prefs.begin("kiln-config", false);
+prefs.putFloat("temp_offset", calibrationOffset);
+prefs.end();
+
+// During normal operation
+Preferences prefs;
+prefs.begin("kiln-config", true); // read-only
+float offset = prefs.getFloat("temp_offset", 0.0); // default 0.0
+float correctedTemp = thermocouple.readCelsius() + offset;
+```
+
+### Calibration Verification
+
+After applying offset:
+1. Repeat ice-point test
+2. Controller should now read 0.0°C ± 0.5°C
+3. Optional: Test at boiling point (100°C at sea level)
+  - Should read 100.0°C ± 1.0°C
+  - Adjust altitude: Boiling point decreases ~1°C per 300m elevation
+
+### When to Recalibrate
+
+- [ ] Initial setup (required)
+- [ ] After replacing thermocouple
+- [ ] After modifying thermocouple wiring
+- [ ] Annually (recommended)
+- [ ] If temperature readings seem inaccurate
+- [ ] After any suspected thermocouple damage
+
+### User Interface Considerations
+
+**Calibration Mode Menu**:
+1. "Start Calibration" → Instructions displayed
+2. "Prepare ice bath (see manual)"
+3. "Insert thermocouple into ice bath"
+4. "Wait for stable reading..."
+5. Display: "Current: 2.3°C | Expected: 0.0°C"
+6. "Apply offset? -2.3°C" → [Yes/No]
+7. "Calibration saved! Verify: [Run test]"
+
+**Display During Calibration**:
+```
+┌──────────────────────┐
+│ CALIBRATION MODE     │
+├──────────────────────┤
+│ Insert probe into    │
+│ ice bath (0°C)       │
+│                      │
+│ Reading: 2.3°C       │
+│ Samples: 12          │
+│ Stable: Yes          │
+│                      │
+│ [Accept] [Cancel]    │
+└──────────────────────┘
+```
+
+### Important Notes
+
+- **MUST be done before PID auto-tune**: PID tuning depends on accurate temperature readings
+- **Single-point calibration**: This method assumes linear error across temperature range (valid for thermocouples)
+- **Cold junction**: MAX31855 handles cold junction compensation automatically
+- **Two-point calibration**: Advanced users can perform both ice-point (0°C) and boiling-point (100°C) calibration to calculate both offset and gain
+- **Safety**: Calibration should be performed with kiln OFF and cool
+
 ## Development Phases
 
 ### Phase 1: Hardware Proof of Concept (Weeks 1-2)
-**Goal**: Validate core hardware functionality
+**Goal**: Validate core hardware functionality and calibrate thermocouple
 
 **Tasks**:
 - [ ] Breadboard ESP32 + MAX31855 + thermocouple
 - [ ] Test temperature reading accuracy
+- [ ] **Perform thermocouple ice-point calibration** (see Calibration Procedure below)
+- [ ] Store calibration offset in NVS
 - [ ] Implement basic SSR control (on/off)
 - [ ] Display temperature on 12864 LCD (ST7920)
 - [ ] Verify rotary encoder input
 
-**Deliverable**: Working breadboard prototype reading temperature and controlling SSR
+**Deliverable**: Working breadboard prototype with calibrated thermocouple reading and SSR control
 
 ### Phase 2: Core Control System (Weeks 3-5)
 **Goal**: Implement temperature control and safety
@@ -427,14 +587,18 @@ lib_deps =
 ### Phase 6: PID Auto-Tune (Weeks 13-14)
 **Goal**: Automated PID optimization
 
+**Prerequisites**:
+- [ ] **Thermocouple MUST be calibrated** (ice-point method completed)
+- [ ] Verify temperature readings accurate to ±1°C
+
 **Tasks**:
 - [ ] Implement relay auto-tune method
 - [ ] Add Ziegler-Nichols calculations
-- [ ] Create auto-tune UI
+- [ ] Create auto-tune UI with calibration check
 - [ ] Test with different kiln loads
 - [ ] Store optimal parameters per kiln
 
-**Deliverable**: One-click PID optimization
+**Deliverable**: One-click PID optimization with calibrated temperature sensing
 
 ### Phase 7: PCB Design (Weeks 15-16)
 **Goal**: Production-ready hardware
