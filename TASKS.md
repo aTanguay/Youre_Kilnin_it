@@ -1,8 +1,8 @@
 # ESP32 Kiln Controller - Task List
 
-**Last Updated**: 2025-10-11
+**Last Updated**: 2025-10-13
 **Current Milestone**: M1 - Hardware Proof of Concept
-**Status**: Development environment setup complete, ready for hardware integration
+**Status**: Development environment setup complete, calibration tasks added, ready for hardware integration
 
 ## Task Status Legend
 - [ ] Not Started
@@ -57,6 +57,14 @@
 - [ ] Display raw temperature readings to serial monitor
 - [ ] Document expected temperature range and accuracy
 
+**Thermocouple Calibration Tasks:**
+- [ ] Implement calibration offset storage in NVS (Preferences library)
+- [ ] Create function to apply calibration offset to readings
+- [ ] Implement stability detection for calibration (readings within ±0.5°C for 60 seconds)
+- [ ] Add calibration data structure (offset, calibration_date, is_calibrated flag)
+- [ ] Test uncalibrated vs calibrated temperature readings
+- [ ] Document calibration procedure in code comments
+
 ### 1.4 SSR Control Implementation
 - [ ] Wire SSR control to GPIO 25
 - [ ] Add optocoupler circuit for isolation
@@ -102,6 +110,12 @@
 - [ ] Document any hardware issues or limitations
 - [ ] Take photos/videos of working prototype
 - [ ] Update PLANNING.md with any design changes
+
+**Calibration Verification:**
+- [!] Perform ice-point thermocouple calibration (mandatory before M2)
+- [ ] Verify calibration is saved correctly to NVS
+- [ ] Test temperature reading accuracy after calibration
+- [ ] Document calibration results (offset value, date)
 
 ---
 
@@ -183,11 +197,24 @@
   - [ ] Start/Stop Heating
   - [ ] Settings
   - [ ] System Info
+  - [ ] Calibrate Thermocouple (new)
 - [ ] Implement menu scrolling
 - [ ] Implement menu selection (push button)
 - [ ] Implement back button functionality (secondary button)
 - [ ] Add menu timeout (return to main after 30s inactivity)
 - [ ] Test full menu navigation
+
+**Calibration UI Tasks:**
+- [ ] Create "Calibrate Thermocouple" menu screen
+- [ ] Display ice bath preparation instructions (step-by-step)
+- [ ] Show current raw temperature reading during calibration
+- [ ] Implement stability indicator (visual feedback when stable)
+- [ ] Display calculated offset after calibration
+- [ ] Add confirmation prompt to save calibration
+- [ ] Show last calibration date on status screen
+- [ ] Add "Calibration Required" warning if never calibrated
+- [ ] Implement calibration reset option in settings
+- [ ] Test complete calibration workflow on LCD
 
 ### 2.7 Audio Feedback System
 - [ ] Wire piezo buzzer to GPIO 26
@@ -375,8 +402,11 @@
   - [ ] Return system state
   - [ ] Return PID output
   - [ ] Return firing progress
+  - [ ] Return calibration status (is_calibrated, last_calibration_date)
 - [ ] Create /api/config endpoint (GET)
   - [ ] Return system configuration
+- [ ] Create /api/calibration endpoint (GET)
+  - [ ] Return calibration data (offset, date, status)
 - [ ] Test API endpoints with browser/Postman
 - [ ] Add JSON response formatting
 - [ ] Implement error responses (404, 500)
@@ -424,6 +454,7 @@
 - [ ] Add current temperature display (large, prominent)
 - [ ] Add target temperature display
 - [ ] Add system status indicator
+- [ ] Add calibration status badge (calibrated/uncalibrated)
 - [ ] Create real-time temperature graph (Chart.js)
 - [ ] Add firing progress section
 - [ ] Display current segment information
@@ -474,6 +505,7 @@
   - [ ] Temperature graph over time
   - [ ] Segment transitions marked
   - [ ] Duration and statistics
+  - [ ] Calibration status at time of firing
 - [ ] Add CSV export button
 - [ ] Implement date range filtering
 - [ ] Add search functionality
@@ -615,6 +647,8 @@
 **Status**: Not Started
 
 ### 6.1 Auto-Tune Algorithm Research
+- [!] **PREREQUISITE: Thermocouple MUST be calibrated before PID auto-tune**
+- [ ] Verify thermocouple calibration is complete
 - [ ] Research relay auto-tune method
 - [ ] Research Ziegler-Nichols tuning rules
 - [ ] Document auto-tune algorithm approach
