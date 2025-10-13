@@ -16,9 +16,11 @@
 // SSR Control
 #define SSR_PIN             25
 
-// I2C pins for OLED Display (SSD1306)
-#define OLED_SDA_PIN        21
-#define OLED_SCL_PIN        22
+// SPI pins for LCD Display (ST7920)
+// Note: ST7920 and MAX31855 share SPI bus (SCK on GPIO 18)
+#define LCD_CS_PIN          15  // Chip Select for LCD
+#define LCD_MOSI_PIN        23  // MOSI (Data)
+#define LCD_SCK_PIN         18  // SCK (Clock) - shared with MAX31855
 
 // Rotary Encoder
 #define ENCODER_CLK_PIN     32
@@ -72,9 +74,8 @@
 #define ENERGY_UPDATE_INTERVAL_MS   1000  // Energy tracking every 1 second
 
 // Display
-#define OLED_WIDTH          128
-#define OLED_HEIGHT         64
-#define OLED_ADDRESS        0x3C
+#define LCD_WIDTH           128
+#define LCD_HEIGHT          64
 
 // Serial
 #define SERIAL_BAUD_RATE    115200

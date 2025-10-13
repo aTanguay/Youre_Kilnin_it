@@ -35,7 +35,7 @@
 - [ ] Order/acquire ESP32 development board (ESP32-WROOM-32)
 - [ ] Order/acquire MAX31855 thermocouple amplifier breakout
 - [ ] Order/acquire K-type thermocouple (high-temp rated)
-- [ ] Order/acquire 128x64 OLED display (SSD1306, I2C)
+- [ ] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
 - [ ] Order/acquire rotary encoder with push button
 - [ ] Order/acquire tactile push buttons (2-3)
 - [ ] Order/acquire piezo buzzer
@@ -69,10 +69,10 @@
 - [ ] Add SSR duty cycle calculation functions
 - [ ] Test various duty cycles (25%, 50%, 75%, 100%)
 
-### 1.5 OLED Display Integration
-- [ ] Wire OLED to ESP32 (I2C: SDA=21, SCL=22)
-- [ ] Install U8g2 library
-- [ ] Initialize OLED in code
+### 1.5 LCD Display Integration (ST7920)
+- [ ] Wire LCD to ESP32 (SPI: CS=15, MOSI=23, SCK=18 shared with MAX31855)
+- [ ] Install U8g2 library (supports ST7920)
+- [ ] Initialize LCD in code (ST7920 constructor)
 - [ ] Display "Hello World" test
 - [ ] Create temperature display layout
 - [ ] Display current temperature (large font)
@@ -93,7 +93,7 @@
 - [ ] Test encoder responsiveness at different speeds
 
 ### 1.7 Integration Testing
-- [ ] Display live temperature on OLED
+- [ ] Display live temperature on LCD
 - [ ] Use rotary encoder to adjust target temperature setpoint
 - [ ] Display both current and target temperature
 - [ ] Manually control SSR based on setpoint (on/off control)
