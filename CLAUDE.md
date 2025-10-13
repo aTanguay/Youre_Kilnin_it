@@ -55,17 +55,18 @@ lib_deps =
 |-----------|-----------|-----------|-------|
 | MAX31855 (Thermocouple) | SPI | CS: 5, CLK: 18, MISO: 19 | K-type thermocouple amplifier |
 | SSR Control | GPIO Output | GPIO 25 | PWM/digital control, optoisolated |
-| OLED Display (SSD1306) | I2C | SDA: 21, SCL: 22 | 128x64 resolution |
+| LCD Display (ST7920) | SPI | CS: 15, MOSI: 23, SCK: 18 | 128x64 dots, blue backlight |
 | Rotary Encoder | GPIO Input | CLK: 32, DT: 33, SW: 34 | With push button |
 | Secondary Button | GPIO Input | GPIO 35 | Additional user input |
 | Emergency Stop | GPIO Input | GPIO 36 (VP) | NC switch, pull-up enabled |
 | Piezo Buzzer | GPIO Output | GPIO 26 | Audio feedback |
 | Status LEDs | GPIO Output | Power: 27, WiFi: 14, Error: 12 | Optional indicators |
 
-**Important**: 
+**Important**:
 - GPIOs 34-39 are input-only (no pull-up/pull-down)
-- Avoid GPIOs 0, 2, 5, 12, 15 (boot strapping pins)
-- SPI, I2C use default pins for reliability
+- Avoid GPIOs 0, 2 (boot strapping - GPIO 5, 12, 15 used strategically for SPI)
+- LCD and MAX31855 share SPI bus (SCK on GPIO 18)
+- Different CS pins allow independent device control
 
 ### Electrical Isolation
 
@@ -170,8 +171,8 @@ data/
 - **PID_v1 (br3ttb)**: Robust PID controller with anti-windup and auto mode
 
 ### Display & Input
-- **U8g2**: Universal graphics library for OLED, excellent for SSD1306, includes fonts and drawing primitives
-- **Wire**: I2C communication (built-in)
+- **U8g2**: Universal graphics library supporting ST7920 LCD via SPI, excellent font support and drawing primitives
+- **SPI**: SPI communication for LCD and MAX31855 (built-in)
 - **Encoder Library** (optional): Simplifies rotary encoder handling with debouncing
 
 ### Web & Network
@@ -480,7 +481,7 @@ float readTemperature() {
 
 ### Unit Testing
 - Test each module independently
-- Mock hardware interfaces (SPI, I2C) for desktop testing
+- Mock hardware interfaces (SPI) for desktop testing
 - Use PlatformIO native testing when possible
 
 ### Integration Testing
