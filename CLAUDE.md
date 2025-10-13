@@ -58,7 +58,7 @@ lib_deps =
 | LCD Display (ST7920) | SPI | CS: 15, MOSI: 23, SCK: 18 | 128x64 dots, blue backlight |
 | Rotary Encoder (Left) | GPIO Input | CLK: 32, DT: 33, SW: 34 | 5V module, 20 pulses/rev, navigation/time |
 | Rotary Encoder (Right) | GPIO Input | CLK: 35, DT: 39, SW: 36 | 5V module, 20 pulses/rev, values/temp |
-| Emergency Stop | GPIO Input | GPIO 13 | NC switch, pull-up enabled |
+| Emergency Stop | Both Encoder SW | Press both SW simultaneously (0.5s hold) | Dual-button safety, no dedicated GPIO |
 | Piezo Buzzer | GPIO Output | GPIO 26 | Audio feedback |
 | Status LEDs | GPIO Output | Power: 27, WiFi: 14, Error: 12 | Optional indicators |
 
@@ -69,6 +69,8 @@ lib_deps =
 - Different CS pins allow independent device control
 - Both rotary encoders are 5V modules - ESP32 GPIO inputs are 5V tolerant (high-impedance)
 - Dual encoders enable simultaneous X/Y control for intuitive profile editing
+- **Emergency stop via dual button press** - both encoder switches held for 0.5s (prevents accidental activation)
+- GPIO 13 available for future expansion (was originally emergency stop)
 
 ### Electrical Isolation
 
@@ -297,8 +299,9 @@ struct SystemConfig {
    - Firing duration < maxFiringDuration (default 48 hours)
    - Watchdog timer reset every cycle
 
-4. **Emergency Stop**
-   - Monitor NC switch on GPIO 36
+4. **Emergency Stop (Dual Button Press)**
+   - Monitor both encoder switches simultaneously
+   - Require 0.5 second hold to trigger (prevents accidental activation)
    - Immediate SSR shutoff on activation
 
 ### Software Safety Patterns

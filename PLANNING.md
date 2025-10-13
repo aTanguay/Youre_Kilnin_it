@@ -266,7 +266,6 @@ Storage (Current/Billing/Annual/Lifetime)
 - [ ] K-Type thermocouple (high-temp rated)
 - [ ] 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
 - [ ] Two rotary encoder modules (5V, 20 pulses/revolution, with push button each)
-- [ ] Tactile push button (1) - for emergency stop if needed
 - [ ] Piezo buzzer
 - [ ] LEDs (3-5) and 220Ω resistors
 - [ ] Solid State Relay (40A, zero-cross) + heat sink
@@ -702,6 +701,21 @@ After applying offset:
   - Left encoder: navigation/time, Right encoder: values/temperature
   - More engaging tactile experience
   - Minimal cost increase (~$3 for second encoder)
+- **Status**: Approved
+
+**Decision 007**: Dual-Button Emergency Stop (No Dedicated GPIO)
+- **Date**: 2025-10-13
+- **Context**: Emergency stop implementation for safety
+- **Decision**: Emergency stop triggered by pressing both encoder switches simultaneously for 0.5 seconds, instead of dedicated emergency stop button
+- **Rationale**:
+  - **Prevents accidental activation**: Requires deliberate two-handed action, much harder to trigger accidentally than single button
+  - **Saves cost**: Eliminates ~$2-3 emergency stop button component
+  - **Saves GPIO pin**: GPIO 13 now available for future expansion (LED, sensor, etc.)
+  - **Dual-action safety pattern**: Similar to professional safety systems (fighter jets, industrial equipment) that require multiple simultaneous actions
+  - **Appropriate for target kilns**: Small, attended 120VAC kilns where user can simply unplug as backup emergency measure
+  - **Simpler hardware**: Fewer components to wire, test, and potentially fail
+  - **Professional UX**: Deliberate dual-button press feels more controlled than panic-hitting single button
+- **Implementation**: Both encoder SW pins monitored simultaneously, 500ms hold time required before triggering emergency shutdown
 - **Status**: Approved
 
 ### Open Questions

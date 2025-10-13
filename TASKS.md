@@ -37,7 +37,6 @@
 - [ ] Order/acquire K-type thermocouple (high-temp rated)
 - [ ] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
 - [ ] Order/acquire TWO rotary encoder modules (5V, 20 pulses/revolution, with push button each)
-- [ ] Order/acquire tactile push buttons (2-3)
 - [ ] Order/acquire piezo buzzer
 - [ ] Order/acquire LEDs and resistors
 - [ ] Order/acquire solid state relay (40A, zero-cross)
@@ -176,17 +175,24 @@
 - [ ] Add thermocouple status indicator on display
 - [ ] Log thermocouple errors with timestamps
 
-### 2.4 Emergency Stop Implementation
-- [ ] Wire emergency stop button to GPIO 36 (input-only pin)
-- [ ] Configure GPIO with internal pull-up
-- [ ] Implement NC (normally closed) switch logic
-- [ ] Create emergency stop interrupt handler
-- [ ] Test emergency stop activation
+### 2.4 Emergency Stop Implementation (Dual-Button)
+- [ ] Implement dual-button emergency stop detection function
+  - [ ] Monitor both ENCODER_LEFT_SW_PIN (GPIO 34) and ENCODER_RIGHT_SW_PIN (GPIO 36)
+  - [ ] Detect when both switches pressed simultaneously
+  - [ ] Implement 0.5 second hold timer (EMERGENCY_STOP_HOLD_TIME_MS)
+  - [ ] Reset timer if either button released before 0.5s
+- [ ] Create emergency stop state machine
+- [ ] Test dual-button detection (both buttons pressed)
+- [ ] Test that single button press does NOT trigger emergency stop
+- [ ] Test hold time requirement (release before 0.5s should not trigger)
 - [ ] Ensure immediate SSR shutdown on activation
-- [ ] Display emergency stop status
+- [ ] Display emergency stop status on LCD
+- [ ] Add visual feedback during hold (progress indicator or countdown)
+- [ ] Add audio feedback (beep when both pressed, alarm when triggered)
 - [ ] Require manual reset after emergency stop
-- [ ] Log emergency stop events
+- [ ] Log emergency stop events with timestamp
 - [ ] Test emergency stop during active heating
+- [ ] Label interface to indicate dual-button emergency stop procedure
 
 ### 2.5 Watchdog Timer
 - [ ] Enable ESP32 hardware watchdog timer

@@ -36,8 +36,10 @@
 #define ENCODER_RIGHT_DT_PIN    39  // Right Encoder Pin B (input-only pin, VN)
 #define ENCODER_RIGHT_SW_PIN    36  // Right select switch (input-only pin, VP)
 
-// Emergency Stop (NC switch)
-#define EMERGENCY_STOP_PIN  13  // Changed from GPIO 36 (now used for right encoder)
+// Emergency Stop - Dual button press (both encoder switches simultaneously)
+// Note: No dedicated GPIO - uses both encoder switches (SW pins above)
+// User presses both encoder buttons for EMERGENCY_STOP_HOLD_TIME_MS to trigger
+#define EMERGENCY_STOP_HOLD_TIME_MS  500  // 0.5 second hold required
 
 // Piezo Buzzer
 #define BUZZER_PIN          26
