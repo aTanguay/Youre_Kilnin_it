@@ -195,19 +195,33 @@ GND            →  SSR Control Input (-)
 
 **Goal**: Wire 128x64 graphic LCD for user interface
 
-**ST7920 LCD Connections (SPI Mode)**:
+**IMPORTANT**: The ST7920 pin labels are confusing! Here's what they ACTUALLY mean in SPI mode:
+
+**ST7920 LCD Pin Mapping (Physical Label → What It Really Is → Where to Connect)**:
 ```
-LCD Pin      ESP32
--------      -----
-VCC (5V)  →  5V
-GND       →  GND
-CS (RS)   →  GPIO 15
-MOSI (R/W)→  GPIO 23
-SCK (E)   →  GPIO 18 (shared with MAX31855 SCK)
-PSB       →  GND (sets SPI mode - CRITICAL!)
-RST       →  3.3V (or leave disconnected)
-BLA (+)   →  5V (backlight anode)
-BLK (-)   →  GND (backlight cathode)
+Physical LCD Label    What It Is (SPI)    ESP32 Connection
+------------------    ----------------    ----------------
+GND                →  Ground           →  GND
+VCC or 5V          →  Power 5V         →  5V
+V0                 →  Contrast adjust  →  (Optional - adjust if needed)
+RS (or DI)         →  CS (Chip Select) →  GPIO 15 ⭐
+R/W                →  MOSI (Data)      →  GPIO 23 ⭐
+E                  →  SCK (Clock)      →  GPIO 18 (shared with MAX31855) ⭐
+DB0-DB7            →  (ignore - parallel mode only, not used in SPI)
+PSB                →  Mode Select      →  GND (CRITICAL - sets SPI mode!) ⭐
+RST                →  Reset            →  3.3V or leave disconnected
+BLA (or A or LED+) →  Backlight +      →  5V
+BLK (or K or LED-) →  Backlight -      →  GND
+```
+
+**Quick Summary - Just connect these 3 signal pins**:
+```
+LCD Label     ESP32
+---------     -----
+RS (or DI) →  GPIO 15  (this is CS - chip select)
+R/W        →  GPIO 23  (this is MOSI - data)
+E          →  GPIO 18  (this is SCK - clock, shared with thermocouple)
+PSB        →  GND      (mode select - MUST be grounded!)
 ```
 
 **CRITICAL**:
