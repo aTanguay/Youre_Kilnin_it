@@ -103,6 +103,22 @@
 
 ---
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Step 1: Power Rails Setup
 
 **Goal**: Establish stable 3.3V and 5V power rails on breadboard
@@ -126,6 +142,23 @@
 **⚠️ STOP**: Do not proceed until power rails are verified!
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Step 2: MAX31855 Thermocouple Amplifier
 
@@ -162,6 +195,19 @@ K-Type Thermocouple
 
 ---
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Step 3: SSR Control Circuit
 
 **Goal**: Wire solid-state relay control (initially with test LED)
@@ -190,6 +236,17 @@ GND            →  SSR Control Input (-)
 **⚠️ WARNING**: Do NOT connect AC mains to SSR during breadboard testing!
 
 ---
+
+
+
+
+
+
+
+
+
+
+
 
 ### Step 4: ST7920 LCD Display
 
@@ -242,6 +299,19 @@ PSB        →  GND      (mode select - MUST be grounded!)
 
 ---
 
+
+
+
+
+
+
+
+
+
+
+
+
+
 ### Step 5: Left Rotary Encoder (Navigation/Time)
 
 **Goal**: Wire left encoder for menu navigation and time axis control
@@ -269,6 +339,26 @@ GND         →  GND
 - 20 pulses per full rotation (detents)
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Step 6: Right Rotary Encoder (Values/Temperature)
 
@@ -298,6 +388,26 @@ GND         →  GND
 - Display/serial should show "EMERGENCY STOP"
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 ### Step 7: Piezo Buzzer and Status LEDs
 
@@ -332,6 +442,20 @@ Error LED →  GPIO 12  →  220Ω  →  GND  (Red - error conditions)
 - Error LED should only light during error conditions
 - Buzzer should beep on startup
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 ---
 
 ## Step 8: Final Checks Before Power-On
@@ -361,6 +485,17 @@ Error LED →  GPIO 12  →  220Ω  →  GND  (Red - error conditions)
 
 ---
 
+
+
+
+
+
+
+
+
+
+
+
 ## Step 9: Upload Firmware and Test
 
 ### Upload Process
@@ -381,6 +516,16 @@ Error LED →  GPIO 12  →  220Ω  →  GND  (Red - error conditions)
    ```bash
    pio device monitor
    ```
+
+
+
+
+
+
+
+
+
+
 
 ### Expected Behavior on First Boot
 
@@ -428,6 +573,18 @@ Initializing...
    - No random pixels or artifacts
 
 ---
+
+
+
+
+
+
+
+
+
+
+
+
 
 ## Troubleshooting Common Issues
 

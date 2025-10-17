@@ -13,6 +13,11 @@
 #define MAX31855_CLK_PIN    18
 #define MAX31855_MISO_PIN   19
 
+// Aliases for hardware test compatibility
+#define THERMOCOUPLE_CS     MAX31855_CS_PIN
+#define THERMOCOUPLE_CLK    MAX31855_CLK_PIN
+#define THERMOCOUPLE_MISO   MAX31855_MISO_PIN
+
 // SSR Control
 #define SSR_PIN             25
 
@@ -21,6 +26,11 @@
 #define LCD_CS_PIN          15  // Chip Select for LCD
 #define LCD_MOSI_PIN        23  // MOSI (Data)
 #define LCD_SCK_PIN         18  // SCK (Clock) - shared with MAX31855
+
+// Aliases for hardware test compatibility
+#define LCD_CS              LCD_CS_PIN
+#define LCD_MOSI            LCD_MOSI_PIN
+#define LCD_SCK             LCD_SCK_PIN
 
 // Dual Rotary Encoders (5V modules - 20 pulses per revolution each)
 // Note: 5V encoder output is safe for ESP32 3.3V GPIO (high-impedance inputs)

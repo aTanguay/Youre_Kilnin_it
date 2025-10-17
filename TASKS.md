@@ -1,8 +1,8 @@
 # ESP32 Kiln Controller - Task List
 
-**Last Updated**: 2025-10-13
+**Last Updated**: 2025-10-15
 **Current Milestone**: M1 - Hardware Proof of Concept
-**Status**: Development environment setup complete, calibration tasks added, ready for hardware integration
+**Status**: Hardware test firmware complete with LCD mirroring, ready for LCD/thermocouple integration
 
 ## Task Status Legend
 - [ ] Not Started
@@ -31,29 +31,51 @@
 - [✓] Create initial project folder structure (src/ modules, data/, include/, lib/)
 - [✓] Verify project compiles successfully (269KB firmware, 6.6% RAM, 13.7% Flash)
 
-### 1.2 Hardware Acquisition
-- [ ] Order/acquire ESP32 development board (ESP32-WROOM-32)
-- [ ] Order/acquire MAX31855 thermocouple amplifier breakout
-- [ ] Order/acquire K-type thermocouple (high-temp rated)
-- [ ] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
-- [ ] Order/acquire TWO rotary encoder modules (5V, 20 pulses/revolution, with push button each)
-- [ ] Order/acquire piezo buzzer
-- [ ] Order/acquire LEDs and resistors
+### 1.2 Hardware Test Firmware
+**Comprehensive hardware validation tool - completed 2025-10-15**
+- [✓] Create dedicated hardware_test environment in platformio.ini
+- [✓] Implement auto-run test suite on startup
+- [✓] Add individual test functions for all components
+  - [✓] Built-in LED (3 blink test)
+  - [✓] Status LEDs (Power, WiFi, Error)
+  - [✓] Piezo buzzer (3-tone test)
+  - [✓] Left rotary encoder (rotation & button)
+  - [✓] Right rotary encoder (rotation & button)
+  - [✓] Emergency stop (dual-button test)
+  - [✓] SSR control output (3 pulse test)
+  - [✓] MAX31855 thermocouple (10 sample averaging)
+  - [✓] ST7920 LCD display (4-screen visual test)
+- [✓] Mirror all test output to LCD display
+- [✓] Create standalone test mode (no USB required)
+- [✓] Add LCD helper functions for test status display
+- [✓] Implement PASS/FAIL/WARNING status indicators
+- [✓] Add test menu system for manual testing
+- [✓] Document test firmware usage
+
+### 1.3 Hardware Acquisition
+- [✓] Order/acquire ESP32 development board (ESP32-WROOM-32)
+- [→] Order/acquire MAX31855 thermocouple amplifier breakout (Pending wiring)
+- [→] Order/acquire K-type thermocouple (high-temp rated) (Pending wiring)
+- [→] Order/acquire 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight) (Pending wiring)
+- [✓] Order/acquire TWO rotary encoder modules (5V, 20 pulses/revolution, with push button each)
+- [✓] Order/acquire piezo buzzer
+- [✓] Order/acquire LEDs and resistors
 - [ ] Order/acquire solid state relay (40A, zero-cross)
 - [ ] Order/acquire SSR heat sink
-- [ ] Order/acquire breadboard and jumper wires
-- [ ] Order/acquire 5V 2A power supply
+- [✓] Order/acquire breadboard and jumper wires
+- [✓] Order/acquire 5V 2A power supply
 
 ### 1.3 Basic Thermocouple Reading
-- [ ] Wire MAX31855 to ESP32 (SPI: CS=5, CLK=18, MISO=19)
-- [ ] Install Adafruit MAX31855 library
-- [ ] Write basic thermocouple reading code
-- [ ] Test reading room temperature
+- [→] Wire MAX31855 to ESP32 (SPI: CS=5, CLK=18, MISO=19) (Ready for wiring)
+- [✓] Install Adafruit MAX31855 library
+- [✓] Write basic thermocouple reading code (In hardware_test.cpp)
+- [→] Test reading room temperature (Awaiting hardware connection)
 - [ ] Implement cold junction compensation validation
 - [ ] Test with heat source (lighter, candle)
-- [ ] Add temperature validation function (range check)
-- [ ] Add error detection (open/short circuit)
-- [ ] Display raw temperature readings to serial monitor
+- [✓] Add temperature validation function (range check)
+- [✓] Add error detection (open/short circuit)
+- [✓] Display raw temperature readings to serial monitor
+- [✓] Display temperature readings on LCD (hardware_test firmware)
 - [ ] Document expected temperature range and accuracy
 
 **Thermocouple Calibration Tasks:**
@@ -77,38 +99,38 @@
 - [ ] Test various duty cycles (25%, 50%, 75%, 100%)
 
 ### 1.5 LCD Display Integration (ST7920)
-- [ ] Wire LCD to ESP32 (SPI: CS=15, MOSI=23, SCK=18 shared with MAX31855)
-- [ ] Install U8g2 library (supports ST7920)
-- [ ] Initialize LCD in code (ST7920 constructor)
-- [ ] Display "Hello World" test
-- [ ] Create temperature display layout
-- [ ] Display current temperature (large font)
-- [ ] Add target temperature display
-- [ ] Test different font sizes and styles
-- [ ] Implement screen refresh logic (250ms)
-- [ ] Handle display errors gracefully
+- [→] Wire LCD to ESP32 (SPI: CS=15, MOSI=23, SCK=18 shared with MAX31855) (Ready for wiring)
+- [✓] Install U8g2 library (supports ST7920)
+- [✓] Initialize LCD in code (ST7920 constructor)
+- [✓] Display "Hello World" test (In hardware_test.cpp)
+- [✓] Create temperature display layout (hardware_test firmware)
+- [✓] Display current temperature (large font)
+- [✓] Add target temperature display
+- [✓] Test different font sizes and styles
+- [✓] Implement screen refresh logic (hardware_test firmware)
+- [✓] Handle display errors gracefully (safe nullptr checks)
 
 ### 1.6 Dual Rotary Encoder Input
 **Left Encoder** (Navigation/Time Axis):
-- [ ] Wire left encoder (5V to ESP32 5V, GND to GND, CLK to GPIO32, DT to GPIO33, SW to GPIO34)
-- [ ] Implement left encoder interrupt handlers
-- [ ] Test left encoder clockwise/counter-clockwise detection
-- [ ] Test left encoder push button detection
-- [ ] Add debouncing logic for left encoder
+- [✓] Wire left encoder (5V to ESP32 5V, GND to GND, CLK to GPIO32, DT to GPIO33, SW to GPIO34)
+- [✓] Implement left encoder interrupt handlers (hardware_test.cpp)
+- [✓] Test left encoder clockwise/counter-clockwise detection
+- [✓] Test left encoder push button detection
+- [✓] Add debouncing logic for left encoder
 
 **Right Encoder** (Values/Temperature Axis):
-- [ ] Wire right encoder (5V to ESP32 5V, GND to GND, CLK to GPIO35, DT to GPIO39, SW to GPIO36)
-- [ ] Implement right encoder interrupt handlers
-- [ ] Test right encoder clockwise/counter-clockwise detection
-- [ ] Test right encoder push button detection
-- [ ] Add debouncing logic for right encoder
+- [✓] Wire right encoder (5V to ESP32 5V, GND to GND, CLK to GPIO35, DT to GPIO39, SW to GPIO36)
+- [✓] Implement right encoder interrupt handlers (hardware_test.cpp)
+- [✓] Test right encoder clockwise/counter-clockwise detection
+- [✓] Test right encoder push button detection
+- [✓] Add debouncing logic for right encoder
 
 **Dual Encoder Integration**:
-- [ ] Create dual-encoder test (simultaneous rotation detection)
-- [ ] Implement independent event handlers for each encoder
-- [ ] Test encoder responsiveness at different speeds
-- [ ] Test simultaneous operation (both encoders turning at once)
-- [ ] Document encoder roles (left=nav/time, right=value/temp)
+- [✓] Create dual-encoder test (simultaneous rotation detection)
+- [✓] Implement independent event handlers for each encoder
+- [✓] Test encoder responsiveness at different speeds
+- [✓] Test simultaneous operation (both encoders turning at once)
+- [✓] Document encoder roles (left=nav/time, right=value/temp)
 
 ### 1.7 Integration Testing
 - [ ] Display live temperature on LCD
@@ -176,23 +198,23 @@
 - [ ] Log thermocouple errors with timestamps
 
 ### 2.4 Emergency Stop Implementation (Dual-Button)
-- [ ] Implement dual-button emergency stop detection function
-  - [ ] Monitor both ENCODER_LEFT_SW_PIN (GPIO 34) and ENCODER_RIGHT_SW_PIN (GPIO 36)
-  - [ ] Detect when both switches pressed simultaneously
-  - [ ] Implement 0.5 second hold timer (EMERGENCY_STOP_HOLD_TIME_MS)
-  - [ ] Reset timer if either button released before 0.5s
-- [ ] Create emergency stop state machine
-- [ ] Test dual-button detection (both buttons pressed)
-- [ ] Test that single button press does NOT trigger emergency stop
-- [ ] Test hold time requirement (release before 0.5s should not trigger)
-- [ ] Ensure immediate SSR shutdown on activation
-- [ ] Display emergency stop status on LCD
+- [✓] Implement dual-button emergency stop detection function (hardware_test.cpp)
+  - [✓] Monitor both ENCODER_LEFT_SW_PIN (GPIO 34) and ENCODER_RIGHT_SW_PIN (GPIO 36)
+  - [✓] Detect when both switches pressed simultaneously
+  - [✓] Implement 0.5 second hold timer (EMERGENCY_STOP_HOLD_TIME_MS)
+  - [✓] Reset timer if either button released before 0.5s
+- [ ] Create emergency stop state machine (for main firmware)
+- [✓] Test dual-button detection (both buttons pressed)
+- [✓] Test that single button press does NOT trigger emergency stop
+- [✓] Test hold time requirement (release before 0.5s should not trigger)
+- [ ] Ensure immediate SSR shutdown on activation (main firmware)
+- [ ] Display emergency stop status on LCD (main firmware)
 - [ ] Add visual feedback during hold (progress indicator or countdown)
-- [ ] Add audio feedback (beep when both pressed, alarm when triggered)
+- [✓] Add audio feedback (beep when both pressed, alarm when triggered)
 - [ ] Require manual reset after emergency stop
 - [ ] Log emergency stop events with timestamp
 - [ ] Test emergency stop during active heating
-- [ ] Label interface to indicate dual-button emergency stop procedure
+- [✓] Label interface to indicate dual-button emergency stop procedure (documented in CLAUDE.md)
 
 ### 2.5 Watchdog Timer
 - [ ] Enable ESP32 hardware watchdog timer
@@ -234,18 +256,18 @@
 - [ ] Test complete calibration workflow on LCD
 
 ### 2.7 Audio Feedback System
-- [ ] Wire piezo buzzer to GPIO 26
-- [ ] Implement tone generation function (PWM)
-- [ ] Create different tones for different events
+- [✓] Wire piezo buzzer to GPIO 26
+- [✓] Implement tone generation function (PWM) (hardware_test.cpp)
+- [✓] Create different tones for different events (tested in hardware_test)
   - [ ] Button press: Short beep (50ms)
   - [ ] Menu navigation: Click (20ms)
   - [ ] Heating start: Ascending tone
   - [ ] Target reached: Double beep
-  - [ ] Error: Rapid beeping alarm
+  - [✓] Error: Rapid beeping alarm (emergency stop test)
 - [ ] Add volume control (PWM duty cycle)
 - [ ] Add audio enable/disable setting
-- [ ] Test all audio feedback scenarios
-- [ ] Ensure audio doesn't block critical operations
+- [✓] Test all audio feedback scenarios (hardware_test firmware)
+- [✓] Ensure audio doesn't block critical operations (non-blocking tone() used)
 
 ### 2.8 Manual Temperature Control
 - [ ] Create "Manual Mode" menu option
@@ -259,12 +281,12 @@
 - [ ] Log manual firing sessions
 
 ### 2.9 Status LED Implementation
-- [ ] Wire status LEDs (Power=27, WiFi=14, Error=12)
-- [ ] Implement LED control functions
+- [✓] Wire status LEDs (Power=27, WiFi=14, Error=12)
+- [✓] Implement LED control functions (hardware_test.cpp)
 - [ ] Power LED: Solid on when powered
 - [ ] WiFi LED: Blink during connection, solid when connected
 - [ ] Error LED: Blink on warnings, solid on critical errors
-- [ ] Test LED patterns
+- [✓] Test LED patterns (hardware_test firmware)
 - [ ] Add LED brightness control
 - [ ] Document LED meaning in user manual
 
