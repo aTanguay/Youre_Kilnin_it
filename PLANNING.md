@@ -164,18 +164,20 @@ Storage (Current/Billing/Annual/Lifetime)
   - Mechanical Relay: Noisy, limited lifespan, contact arcing
   - TRIAC Circuit: More complex, safety concerns with DIY builds
 
-**Display**: 128x64 LCD Graphic Module (ST7920, SPI)
-- **Why**: Larger physical size (better visibility), lower cost than OLED, full graphics capability with blue backlight, proven reliability
+**Display**: 2.4" or 2.8" Color TFT (ILI9341, SPI)
+- **Why**: High resolution (240x320), 65K colors, enables stunning procedural flame animation, professional appearance
 - **Advantages**:
-  - Bigger display area improves readability in studio environment
-  - Lower cost (~$5-8 vs $10-12 for OLED)
-  - Blue backlight provides excellent contrast
-  - Widely available from multiple suppliers
-  - Full graphics mode (128x64 dots) supports charts and custom layouts
+  - Full color graphics for beautiful UI and animations
+  - 240x320 resolution provides excellent detail for graphs and visualizations
+  - Procedural flame animation looks spectacular in color (vs monochrome)
+  - Color-coded temperature zones and status indicators
+  - Production cost similar to LCD (~$10) when sourced in quantity
+  - Professional, modern appearance
+  - TFT_eSPI library is excellent and well-supported
 - **Alternatives Considered**:
-  - 128x64 OLED (SSD1306): Smaller, higher cost, but lower power
+  - 128x64 LCD (ST7920): Monochrome, lower resolution, "ugly" appearance
+  - 128x64 OLED (SSD1306): Too small, monochrome
   - 20x4 Character LCD: Character-only (no graphs), limited flexibility
-  - TFT Color Display: Higher cost, unnecessary for application
 
 **User Input**: Dual Rotary Encoders
 - **Specifications**: Two 5V rotary encoders, 20 pulses per revolution each (detents)
@@ -222,7 +224,7 @@ Storage (Current/Billing/Annual/Lifetime)
 | ArduinoJson | Profile/config storage | De facto standard, well-tested, efficient |
 | Adafruit MAX31855 | Thermocouple interface | Industry standard, reliable, well-documented |
 | PID_v1 (br3ttb) | Temperature control | Proven PID implementation with auto-tune support |
-| U8g2 | ST7920 LCD graphics | Universal graphics library, supports ST7920 SPI, excellent fonts |
+| TFT_eSPI | ILI9341 color TFT graphics | Fast, feature-rich, excellent ESP32 support, hardware SPI |
 | Preferences | Settings storage | ESP32 NVS wrapper, simple key-value store |
 
 **Web Technologies**
@@ -259,12 +261,12 @@ Storage (Current/Billing/Annual/Lifetime)
 ### Hardware Tools
 
 **Development & Testing**
-- [ ] ESP32 Development Board (ESP32-WROOM-32)
+- [x] ESP32 Development Board (ESP32-WROOM-32)
 - [ ] USB-C or Micro-USB cable (depending on dev board)
 - [ ] Breadboard and jumper wires
 - [ ] MAX31855 Thermocouple Amplifier breakout board
 - [ ] K-Type thermocouple (high-temp rated)
-- [ ] 12864 LCD Display Module (128x64 dots, ST7920 controller, blue backlight)
+- [x] 2.4" or 2.8" ILI9341 Color TFT Display (240x320, SPI, 65K colors)
 - [ ] Two rotary encoder modules (5V, 20 pulses/revolution, with push button each)
 - [ ] Piezo buzzer
 - [ ] LEDs (3-5) and 220Ω resistors
@@ -663,18 +665,21 @@ After applying offset:
 - **Rationale**: Lower EMI, less interference with thermocouple readings
 - **Status**: Approved
 
-**Decision 003**: Display Selection - ST7920 LCD vs OLED
-- **Date**: 2025-10-11 (Updated: 2025-10-11)
-- **Context**: Display capabilities, cost, and visibility requirements
-- **Decision**: 12864 LCD Module with ST7920 controller (SPI) as primary display
+**Decision 003**: Display Selection - ILI9341 Color TFT
+- **Date**: 2025-10-11 (Updated: 2025-10-26)
+- **Context**: Display capabilities, cost, and the "wow factor" of procedural flame animation
+- **Decision**: 2.4" ILI9341 Color TFT (240x320, 65K colors, SPI) as primary display
 - **Rationale**:
-  - Larger physical size improves readability in studio environment
-  - Lower cost (~$5-8 vs $10-12 for OLED)
-  - Full graphics mode (128x64 dots) supports temperature graphs and custom UI
-  - Blue backlight provides excellent visibility
-  - U8g2 library provides excellent ST7920 support
-  - More cost-effective without sacrificing functionality
-- **Status**: Approved
+  - **Procedural flame animation**: Color makes the real-time flame effect spectacular vs monochrome
+  - **Production cost parity**: ~$10 in quantity, same as LCD - no cost penalty
+  - **Professional appearance**: Modern, polished look vs "ugly" LCD
+  - **Better visualization**: Color-coded temperature zones, status indicators, graphs
+  - **High resolution**: 240x320 provides excellent detail for UI elements
+  - **Perfect timing**: Prototype phase, minimal code written, easy to switch now
+  - **TFT_eSPI library**: Excellent library support, well-documented, performant
+  - **The flex**: Flame that reacts to PID output in full color is THE killer feature
+- **Previous**: ST7920 LCD (128x64 monochrome) - functional but limited
+- **Status**: Approved - Hardware acquired
 
 **Decision 004**: PlatformIO vs Arduino IDE
 - **Date**: 2025-10-11
@@ -770,6 +775,7 @@ After applying offset:
 ## Future Enhancements
 
 ### Near-Term (V1.x Updates)
+- [ ] **LCD Ambient Animations** - Rotating mug, flickering flame, or other animations during firing for visual feedback
 - [ ] Cool-down monitoring with notification when safe to open
 - [ ] Power failure recovery (resume or abort)
 - [ ] Pre-heat soak for moisture removal

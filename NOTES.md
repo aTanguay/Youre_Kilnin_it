@@ -1230,5 +1230,578 @@ NOTES.md              - This comprehensive documentation
 
 ---
 
+---
+
+## LCD Display Animations
+
+### Overview
+
+The ST7920 LCD (128x64 monochrome) can display simple animations during firing operations to provide visual feedback that the system is active. Each pixel is either on or off (no grayscale).
+
+### Animation Capabilities
+
+**Display Specs for Animation**:
+- **Resolution**: 128x64 pixels
+- **Type**: Monochrome (1-bit per pixel)
+- **Frame Rate**: ~6-8 FPS typical (controlled by display refresh loop)
+- **Memory**: Animations stored in PROGMEM (flash), not RAM
+
+### Animation Ideas
+
+1. **Rotating mug** - Shows active firing status
+2. **Flame flickering** - Heating indicator
+3. **Temperature rising** - Thermometer filling up
+4. **Spinning kiln** - Side view of kiln rotating
+5. **Progress bar with animated segments**
+
+### Image Format: Bitmap Arrays
+
+Animations use byte arrays where each bit represents 1 pixel (on/off):
+
+**Binary Format**:
+```cpp
+// Example: 16x16 pixel mug (frame 1 of rotation)
+const unsigned char mug_frame1[] PROGMEM = {
+  0b00000110, 0b01100000,  // Row 1 (16 pixels = 2 bytes)
+  0b00001001, 0b10010000,  // Row 2
+  0b00010000, 0b00001000,  // Row 3
+  // ... 16 rows total
+};
+```
+
+**Hexadecimal Format** (easier with conversion tools):
+```cpp
+const unsigned char mug_frame1[] PROGMEM = {
+  0x06, 0x60,  // Row 1
+  0x09, 0x90,  // Row 2
+  0x10, 0x08,  // Row 3
+  // ... more rows
+};
+```
+
+### Creating Animation Art
+
+**Step 1: Draw Frames**
+- Use any graphics program (Photoshop, GIMP, Aseprite, etc.)
+- Make artwork monochrome (pure black & white, no gray)
+- Recommended size: 32x32 or 48x48 pixels for a mug
+- Create 8-12 frames of rotation for smooth animation
+
+**Step 2: Convert to C Arrays**
+
+Use conversion tools:
+
+**Online Tool - image2cpp** (Recommended):
+- Website: https://javl.github.io/image2cpp/
+- Upload PNG/JPG
+- Configure settings:
+  - Canvas size: match your image (e.g., 32x32)
+  - Background color: Black
+  - Invert colors: if needed
+  - Brightness threshold: 128
+  - Draw mode: Horizontal
+  - Output: Arduino code
+- Copy generated array code
+
+**Desktop Tool - LCD Image Converter**:
+- Free Windows/Linux tool
+- More control over output format
+- Batch processing for multiple frames
+
+**Step 3: Paste into Code**
+```cpp
+// Store multiple frames as 2D array
+const unsigned char mug_frames[8][128] PROGMEM = {
+  { /* frame 0 data */ },
+  { /* frame 1 data */ },
+  { /* frame 2 data */ },
+  // ... 8 frames total
+};
+```
+
+### Implementation Code
+
+**Animation Function**:
+```cpp
+// In your display task (runs every 250ms)
+void displayTask(void *parameter) {
+    uint8_t currentFrame = 0;
+    unsigned long lastFrameTime = 0;
+    const int FRAME_DELAY = 150;  // 150ms per frame = ~6.7 fps
+
+    while(1) {
+        u8g2.clearBuffer();
+
+        // Draw status info (temperature, time, etc.)
+        u8g2.setCursor(0, 10);
+        u8g2.print(currentTemp);
+        u8g2.print("°C");
+
+        // Draw animated mug (only if firing)
+        if (kilnState.state == STATE_FIRING) {
+            if (millis() - lastFrameTime > FRAME_DELAY) {
+                currentFrame = (currentFrame + 1) % 8;  // 8 frames, loop
+                lastFrameTime = millis();
+            }
+
+            // Draw the current frame at position (80, 30)
+            u8g2.drawXBMP(80, 30, 32, 32, mug_frames[currentFrame]);
+        }
+
+        u8g2.sendBuffer();
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+    }
+}
+```
+
+**LEDC/Buzzer Configuration**:
+```cpp
+// Buzzer LEDC configuration (ESP32-native)
+#define BUZZER_CHANNEL 0
+#define BUZZER_RESOLUTION 8  // 8-bit resolution
+
+void playTone(uint32_t frequency, uint32_t duration) {
+    if (frequency > 0) {
+        ledcWriteTone(BUZZER_CHANNEL, frequency);  // Start tone
+        delay(duration);                            // Wait
+        ledcWriteTone(BUZZER_CHANNEL, 0);          // Stop tone
+    }
+}
+```
+
+### Memory Considerations
+
+**Size Calculation**:
+- 32x32 pixel image = 1,024 pixels
+- 1,024 pixels ÷ 8 bits/byte = 128 bytes per frame
+- 8 frames × 128 bytes = 1,024 bytes (1KB) total
+- Stored in `PROGMEM` (flash memory, not RAM)
+
+**ESP32 Flash Capacity**:
+- ESP32 has 4MB flash typical
+- 1-2KB for animation is negligible (~0.05%)
+- Could have multiple different animations if desired
+
+**Multiple Animation Sets** (Optional):
+```cpp
+const unsigned char idle_animation[4][64] PROGMEM = { /* small 16x16 idle */ };
+const unsigned char firing_animation[8][128] PROGMEM = { /* 32x32 firing */ };
+const unsigned char cooling_animation[8][128] PROGMEM = { /* 32x32 cooling */ };
+```
+
+### Frame Rate & Performance
+
+**Optimal Settings**:
+- **Frame delay**: 100-200ms (5-10 FPS)
+- **Frame count**: 6-12 frames for smooth loop
+- **Display update**: 250ms refresh (in displayTask)
+
+**Performance Impact**:
+- Minimal - drawing bitmap is fast operation
+- U8g2 library optimized for monochrome displays
+- Does not block other tasks (runs in display task)
+
+### Example Workflow
+
+1. **Create Art**:
+   - Draw 8 frames of rotating mug in Photoshop (32x32px, black & white)
+   - Export each as PNG (mug_001.png through mug_008.png)
+
+2. **Convert to Code**:
+   - Go to https://javl.github.io/image2cpp/
+   - Upload mug_001.png
+   - Copy generated array code
+   - Repeat for all 8 frames
+
+3. **Add to Firmware**:
+   - Create new file `src/ui/animations.h`
+   - Paste all frame arrays
+   - Include in display.cpp
+
+4. **Integrate**:
+   - Add animation rendering to displayTask()
+   - Only show during STATE_FIRING
+   - Test frame timing
+
+### Design Guidelines
+
+**Keep It Simple**:
+- Monochrome = high contrast, clear shapes
+- Avoid fine details (will be lost at low resolution)
+- Bold outlines work best
+- Test on actual display (looks different than screen)
+
+**Timing**:
+- Too fast: Distracting, hard to see
+- Too slow: Looks choppy, not smooth
+- Sweet spot: 6-8 FPS for rotation animations
+
+**Placement**:
+- Leave room for essential info (temp, time, status)
+- Corner placement common (80, 30) coordinates
+- Don't cover critical data
+
+**User Experience**:
+- Idle: No animation or subtle pulse
+- Firing: Active animation (rotating, flickering)
+- Soaking: Slower animation
+- Cooling: Different animation or fading
+- Error: No animation (solid error icon)
+
+### Tools Reference
+
+**Image Creation**:
+- Photoshop/GIMP: Full-featured
+- Aseprite: Pixel art focused, great for animations
+- Piskel: Free online pixel art editor
+- Paint.NET: Windows, simple and free
+
+**Bitmap Conversion**:
+- image2cpp: https://javl.github.io/image2cpp/ (online, easy)
+- LCD Image Converter: Desktop tool, batch processing
+- Gimp + plugin: Can export to C array directly
+
+**Testing**:
+- U8g2 has desktop test mode
+- Can preview on computer before uploading to ESP32
+- Helps iterate faster without hardware
+
+### Future Ideas
+
+**Context-Aware Animations**:
+- Different animations for each firing stage
+- Speed changes based on ramp rate
+- Pulsing based on PID output percentage
+- Error states with flashing warning icons
+
+**User Customization**:
+- Upload custom animations via web interface
+- Select from preset animation library
+- Disable animations (for minimal display mode)
+
+---
+
+## Advanced: Procedural Flame Animation 🔥
+
+### The Ultimate Flex
+
+Instead of pre-rendered flipbook animations, generate a **living, breathing flame** in real-time that **reacts to actual kiln heating**. This is demoscene-level programming that's both beautiful AND functional.
+
+### Why This Is Awesome
+
+**The Flex**:
+- Most controllers: Static icon or no animation
+- **Your controller**: Physics-simulated fire that shows real-time heating intensity
+- **Legitimately impressive** technical achievement
+- **Never repeats** - always unique and organic
+
+**The Function**:
+- **Visual throttle indicator**: Flame intensity = SSR duty cycle / PID output
+- **At-a-glance feedback**: Big flame = heating hard, small flame = maintaining temp
+- **Idle state**: Tiny "pilot light" flicker
+- **Cooling state**: Dying embers
+- **Firing state**: Roaring flame that pulses with heating cycles
+
+**The Efficiency**:
+- **Tiny memory**: 512 bytes for 32×16 flame buffer
+- **Fast**: Simple math, runs in microseconds
+- **Minimal code**: ~50 lines of core algorithm
+- **No PROGMEM**: No bitmap storage needed!
+
+### Classic Fire Effect Algorithm
+
+Based on the famous 90s PC demoscene fire effect, adapted for monochrome LCD:
+
+**Core Concept**:
+1. Bottom row = "fuel source" (random hot pixels)
+2. Heat propagates upward
+3. Heat cools as it rises
+4. Averaging creates smooth, organic movement
+
+**The Math**:
+```cpp
+// Each pixel = average of 3 pixels below it, minus cooling
+heat[y][x] = (heat[y+1][x-1] + heat[y+1][x] + heat[y+1][x+1]) / 3 - cooling
+```
+
+### Implementation
+
+**Global Fire Buffer**:
+```cpp
+// Fire effect buffer (32 pixels wide × 16 pixels tall)
+// Uses only 512 bytes of RAM
+uint8_t fireBuffer[16][32];  // [y][x] - stored upside down for efficiency
+unsigned long lastFireUpdate = 0;
+const int FIRE_UPDATE_INTERVAL = 50;  // 20 FPS fire animation
+```
+
+**Fire Update Function**:
+```cpp
+/**
+ * Update procedural flame animation
+ * Called every 50ms for smooth 20 FPS animation
+ */
+void updateFire() {
+    // Calculate flame intensity based on PID output (0-100%)
+    // Higher PID output = bigger, hotter flame
+    int baseHeat = 100;  // Minimum heat (pilot light)
+
+    if (kilnState.state == STATE_FIRING || kilnState.state == STATE_PREHEATING) {
+        // Active heating - flame intensity matches PID output
+        baseHeat = map(kilnState.pidOutput, 0, 100, 120, 255);
+    } else if (kilnState.state == STATE_SOAKING) {
+        // Soaking - moderate flame (maintaining temp)
+        baseHeat = map(kilnState.pidOutput, 0, 100, 80, 180);
+    } else if (kilnState.state == STATE_COOLING) {
+        // Cooling - dying embers only
+        baseHeat = random(40, 80);
+    } else {
+        // Idle - tiny pilot light flicker
+        baseHeat = random(60, 100);
+    }
+
+    // STEP 1: Add random heat at bottom row (fuel source)
+    for (int x = 0; x < 32; x++) {
+        // Random variation creates organic flickering
+        int heat = random(baseHeat - 30, baseHeat);
+        fireBuffer[15][x] = constrain(heat, 0, 255);
+    }
+
+    // STEP 2: Propagate heat upward with cooling
+    for (int y = 0; y < 15; y++) {
+        for (int x = 0; x < 32; x++) {
+            // Get pixels from row below (with wrapping at edges)
+            int left = (x == 0) ? 31 : x - 1;
+            int right = (x == 31) ? 0 : x + 1;
+
+            // Average the 3 pixels below this one
+            int heat = (fireBuffer[y + 1][left] +
+                       fireBuffer[y + 1][x] +
+                       fireBuffer[y + 1][right]) / 3;
+
+            // Cool down as heat rises (more cooling at top)
+            int cooling = random(5, 15 + (y * 2));  // More cooling higher up
+            heat = (heat > cooling) ? heat - cooling : 0;
+
+            fireBuffer[y][x] = heat;
+        }
+    }
+}
+```
+
+**Fire Drawing Function**:
+```cpp
+/**
+ * Draw procedural flame to display
+ * Position: Bottom-right corner (or wherever you want)
+ */
+void drawFire(int xPos, int yPos) {
+    for (int y = 0; y < 16; y++) {
+        for (int x = 0; x < 32; x++) {
+            // Threshold: if heat > 128, draw pixel (white)
+            // For monochrome display, we only have on/off
+            if (fireBuffer[y][x] > 128) {
+                u8g2.drawPixel(xPos + x, yPos + (15 - y));  // Flip Y (draw upward)
+            }
+        }
+    }
+}
+```
+
+**Integration in Display Task**:
+```cpp
+void displayTask(void *parameter) {
+    while(1) {
+        u8g2.clearBuffer();
+
+        // Draw temperature, status, etc.
+        u8g2.setFont(u8g2_font_ncenB08_tr);
+        u8g2.setCursor(0, 10);
+        u8g2.print(state.currentTemp, 1);
+        u8g2.print("C");
+
+        // Update and draw procedural flame
+        if (millis() - lastFireUpdate >= FIRE_UPDATE_INTERVAL) {
+            updateFire();
+            lastFireUpdate = millis();
+        }
+
+        // Draw fire in bottom-right corner
+        if (kilnState.state != STATE_IDLE && kilnState.state != STATE_ERROR) {
+            drawFire(96, 48);  // 32 pixels wide, 16 pixels tall
+        } else if (kilnState.state == STATE_IDLE) {
+            drawFire(96, 56);  // Smaller position for pilot light
+        }
+
+        u8g2.sendBuffer();
+        vTaskDelay(250 / portTICK_PERIOD_MS);
+    }
+}
+```
+
+### Visual Behavior by State
+
+**STATE_IDLE**:
+- Tiny pilot light flicker
+- Base heat: 60-100
+- Minimal height (1-3 pixels tall)
+- Slow, gentle pulsing
+
+**STATE_PREHEATING / STATE_FIRING**:
+- **Flame intensity = PID output percentage**
+- PID at 100%: Roaring flame (12-16 pixels tall, very active)
+- PID at 50%: Moderate flame (6-10 pixels tall)
+- PID at 10%: Small flame (2-4 pixels tall)
+- Creates visual "throttle" indicator
+
+**STATE_SOAKING**:
+- Steady moderate flame
+- Less intense than active heating
+- Shows system is maintaining temperature
+
+**STATE_COOLING**:
+- Dying embers
+- Very low intensity (40-80 heat)
+- Slow fade out effect
+- Flickering at base only
+
+**STATE_ERROR**:
+- No flame (dark)
+- Clear visual indication of problem
+
+### Performance Characteristics
+
+**Memory Usage**:
+- Fire buffer: 512 bytes RAM (16 × 32 = 512 bytes)
+- Code size: ~200 bytes compiled
+- **Total overhead**: <1KB
+
+**CPU Usage**:
+- Update time: ~300-500 microseconds per frame
+- Update frequency: 20 FPS (every 50ms)
+- **CPU load**: <1% of ESP32 capacity
+- Does NOT interfere with PID control or safety monitoring
+
+**Display Impact**:
+- Drawing: ~100-200 microseconds
+- Integrated into existing display task (no additional task needed)
+- Minimal impact on display refresh rate
+
+### Advanced Variations
+
+**1. Multi-Color Simulation** (monochrome dithering):
+```cpp
+// Use dithering patterns to simulate flame colors
+// Dense pixels = white-hot, sparse pixels = red-orange
+if (fireBuffer[y][x] > 200) {
+    u8g2.drawPixel(x, y);  // Always draw (white-hot core)
+} else if (fireBuffer[y][x] > 150) {
+    if ((x + y) % 2 == 0) u8g2.drawPixel(x, y);  // 50% dither (orange)
+} else if (fireBuffer[y][x] > 100) {
+    if ((x + y) % 3 == 0) u8g2.drawPixel(x, y);  // 33% dither (red)
+}
+```
+
+**2. Width Scaling**:
+```cpp
+// Narrow flame when low heat, wide flame when high heat
+int flameWidth = map(baseHeat, 60, 255, 8, 32);
+// Only update/draw center portion when narrow
+```
+
+**3. Temperature-Based Color** (if using color display):
+```cpp
+// Map heat value to color gradient
+// 255 = white, 200 = yellow, 150 = orange, 100 = red, <100 = dark red
+```
+
+**4. Turbulence/Wind**:
+```cpp
+// Add horizontal offset that changes over time
+int wind = sin(millis() / 500.0) * 3;  // Sway left/right
+// Apply offset when reading pixels below
+```
+
+### Troubleshooting
+
+**Flame looks too static**:
+- Increase random range in base heat: `random(baseHeat - 50, baseHeat)`
+- Increase cooling randomness: `random(5, 20)`
+
+**Flame too chaotic/flickery**:
+- Decrease random ranges
+- Increase averaging (use 4 or 5 pixels instead of 3)
+- Reduce cooling factor
+
+**Performance issues**:
+- Reduce fire buffer size (try 24×12 or 16×12)
+- Increase update interval (try 100ms instead of 50ms)
+- Use integer math only (avoid float)
+
+**Flame disappears**:
+- Check threshold value (try lowering from 128 to 100)
+- Verify base heat is sufficient (minimum 120 for visible flame)
+- Check Y-flip in drawing (upside down?)
+
+### Code Size Optimization
+
+**Minimal Version** (~30 lines):
+```cpp
+uint8_t fire[16][32];
+
+void updateFire() {
+    int h = map(pidOutput, 0, 100, 120, 255);
+    for (int x = 0; x < 32; x++) fire[15][x] = random(h - 30, h);
+    for (int y = 0; y < 15; y++) {
+        for (int x = 0; x < 32; x++) {
+            int l = (x == 0) ? 31 : x - 1;
+            int r = (x == 31) ? 0 : x + 1;
+            int avg = (fire[y+1][l] + fire[y+1][x] + fire[y+1][r]) / 3;
+            fire[y][x] = (avg > 10) ? avg - random(5, 15) : 0;
+        }
+    }
+}
+
+void drawFire() {
+    for (int y = 0; y < 16; y++)
+        for (int x = 0; x < 32; x++)
+            if (fire[y][x] > 128) u8g2.drawPixel(96 + x, 63 - y);
+}
+```
+
+### The Wow Factor
+
+**What Users See**:
+- Turn on kiln → Small pilot light appears
+- Start firing → Flame grows as kiln heats up
+- PID kicks in hard → WHOOSH, big flame!
+- Reaching setpoint → Flame settles to steady burn
+- Soaking → Gentle, consistent flame
+- Cooling → Dying embers fade away
+
+**What Other Makers See**:
+- "Wait, is that... procedural generation?"
+- "On a KILN CONTROLLER?!"
+- "That's actually showing the heating percentage?!"
+- "This is the coolest embedded UI I've seen"
+
+### Conclusion
+
+**This is THE feature** that makes your controller stand out. It's:
+- ✅ **Functional**: Real-time visual feedback of heating intensity
+- ✅ **Beautiful**: Organic, never-repeating animation
+- ✅ **Efficient**: <1KB overhead, <1% CPU usage
+- ✅ **Impressive**: Legitimate technical flex
+- ✅ **Fun**: Makes monitoring the kiln genuinely enjoyable
+
+**Bottom line**: For ~200 bytes of code and 512 bytes of RAM, you get a feature that:
+1. Provides real functional value (visual PID output indicator)
+2. Looks absolutely sick
+3. Makes people say "wait, WHAT?!"
+
+**This is a must-have feature.** 🔥
+
+---
+
 **Document Status**: Reference material - update as needed
 **Last Updated**: 2025-10-17

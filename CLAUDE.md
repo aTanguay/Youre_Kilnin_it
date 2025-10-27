@@ -21,7 +21,7 @@
 |-----------|-----------|-----------|-------|
 | MAX31855 (Thermocouple) | SPI | CS: 5, CLK: 18, MISO: 19 | K-type thermocouple amplifier |
 | SSR Control | GPIO Output | GPIO 25 | PWM/digital control, optoisolated |
-| LCD Display (ST7920) | SPI | CS: 15, MOSI: 23, SCK: 18 | 128x64 dots, blue backlight |
+| TFT Display (ILI9341) | SPI | CS: 15, DC: 2, MOSI: 23, SCK: 18, RST: 4 | 240x320 color, 2.4" or 2.8" |
 | Rotary Encoder (Left) | GPIO Input | CLK: 32, DT: 33, SW: 34 | 5V module, 20 pulses/rev, navigation/time |
 | Rotary Encoder (Right) | GPIO Input | CLK: 35, DT: 39, SW: 36 | 5V module, 20 pulses/rev, values/temp |
 | Emergency Stop | Both Encoder SW | Press both SW simultaneously (0.5s hold) | Dual-button safety, no dedicated GPIO |
@@ -30,8 +30,8 @@
 
 **GPIO Notes**:
 - GPIOs 34-39: Input-only (right encoder uses these)
-- Avoid GPIOs 0, 2 (boot strapping)
-- LCD/MAX31855 share SPI bus (different CS pins)
+- GPIO 2: Used for TFT DC (data/command select), pulled down at boot (safe)
+- TFT/MAX31855 share SPI bus (different CS pins)
 - Emergency stop: Both encoder SW pressed simultaneously for 0.5s
 
 **⚠️ CRITICAL SAFETY**: AC mains isolated from ESP32 via SSR optocoupler, separate power supplies
@@ -131,7 +131,7 @@ data/
 |---------|---------|
 | Adafruit MAX31855 | Thermocouple SPI interface |
 | PID_v1 (br3ttb) | PID controller with anti-windup |
-| U8g2 | ST7920 LCD graphics driver |
+| TFT_eSPI | ILI9341 color TFT graphics driver |
 | ESPAsyncWebServer | Non-blocking web server |
 | ArduinoJson | JSON for profiles/config |
 | Preferences | ESP32 NVS storage |

@@ -14,6 +14,8 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
 
 - ✅ **Precise PID Temperature Control** - ±2°C accuracy with auto-tuning
 - ✅ **Multi-Segment Firing Profiles** - Bisque, glaze, raku, and custom schedules
+- ✅ **Procedural Flame Animation** 🔥 - Real-time visual feedback showing heating intensity
+- ✅ **Color TFT Display** - 240x320 full-color display with stunning graphics
 - ✅ **Web-Based Monitoring** - Real-time temperature graphs and control from any device
 - ✅ **Energy Cost Tracking** - Monitor daily, billing cycle, and lifetime costs
 - ✅ **Comprehensive Safety Systems** - Watchdog timers, thermal limits, emergency stop
@@ -42,7 +44,7 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
 | **Control Method** | PID with auto-tuning |
 | **SSR Control** | Time-proportional (2s cycle) |
 | **Kiln Compatibility** | 120VAC, up to 1800W (15A circuit) |
-| **Display** | 128x64 ST7920 LCD (blue backlight) |
+| **Display** | 2.4" ILI9341 Color TFT (240x320, 65K colors) |
 | **Input** | Dual rotary encoders + emergency stop |
 | **Connectivity** | WiFi (2.4GHz), web interface |
 | **Power Supply** | 5V/2A USB or DC adapter |
@@ -59,7 +61,7 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
 | ESP32-WROOM-32 Dev Board | 1 | $6-8 | 38-pin version |
 | MAX31855 Thermocouple Module | 1 | $8-12 | Includes K-type thermocouple |
 | Solid State Relay (SSR) | 1 | $8-15 | 25A, 3-32VDC input, 120VAC output |
-| ST7920 128x64 LCD Display | 1 | $8-12 | SPI interface, blue backlight |
+| ILI9341 2.4" Color TFT Display | 1 | $10-12 | 240x320, SPI interface, 65K colors |
 | Rotary Encoder (5V, 20 pulses) | 2 | $4-6 | With push-button switches |
 | Piezo Buzzer (active) | 1 | $1-2 | 5V, audio feedback |
 | Status LEDs (RGB or single) | 3 | $1-2 | Power, WiFi, Error indicators |
@@ -85,7 +87,7 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
 | Component | GPIO Pins | Interface |
 |-----------|-----------|-----------|
 | MAX31855 (Thermocouple) | CS: 5, CLK: 18, MISO: 19 | SPI |
-| ST7920 LCD | CS: 15, MOSI: 23, SCK: 18 | SPI (shared) |
+| ILI9341 TFT Display | CS: 15, DC: 2, RST: 4, MOSI: 23, SCK: 18 | SPI (shared) |
 | Left Rotary Encoder | CLK: 32, DT: 33, SW: 34 | Digital input |
 | Right Rotary Encoder | CLK: 35, DT: 39, SW: 36 | Digital input |
 | SSR Control | GPIO 25 | Digital output (PWM) |
@@ -107,7 +109,8 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
 
 2. **Wire Low-Voltage Connections** (3.3V/5V DC)
    - Connect ESP32 to MAX31855 module (SPI)
-   - Connect ESP32 to LCD display (SPI, shared bus)
+   - Connect ESP32 to ILI9341 TFT display (SPI, shared bus)
+     - See TFT_WIRING.md for detailed pin connections
    - Connect rotary encoders to ESP32 (digital inputs)
    - Connect buzzer and LEDs to ESP32 (digital outputs)
    - Connect 5V power supply to ESP32 VIN pin
@@ -540,10 +543,12 @@ Every kiln has different thermal mass, insulation, and element characteristics. 
 
 ### Display Not Working
 
-- **Check SPI Wiring**: Verify CS=15, MOSI=23, SCK=18
-- **Contrast Adjustment**: Some ST7920 displays have potentiometer
-- **Check Backlight**: May be wired separately (verify power to LED pins)
-- **Test with Example**: Load U8g2 library examples to isolate issue
+- **Check SPI Wiring**: Verify CS=15, DC=2, RST=4, MOSI=23, SCK=18
+- **Check Power**: Verify 3.3V (or 5V if module has regulator) at VCC
+- **Check Backlight**: Verify LED pin connected to 3.3V
+- **Test with Example**: Run `pio run -e tft_test --target upload` (see TFT_WIRING.md)
+- **White Screen**: CS or DC pin may be wrong/loose
+- **Garbled Display**: Check DC pin connection, try lower SPI speed
 
 ### Kiln Overshoots Target Temperature
 
@@ -700,7 +705,7 @@ You are free to:
 - [ArduinoJson](https://arduinojson.org/) - Benoit Blanchon
 - [Adafruit MAX31855 Library](https://github.com/adafruit/Adafruit-MAX31855-library) - Adafruit Industries
 - [Arduino PID Library](https://github.com/br3ttb/Arduino-PID-Library) - Brett Beauregard
-- [U8g2 Graphics Library](https://github.com/olikraus/u8g2) - Oliver Kraus
+- [TFT_eSPI Graphics Library](https://github.com/Bodmer/TFT_eSPI) - Bodmer
 
 ### Inspiration
 
