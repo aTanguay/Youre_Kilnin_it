@@ -22,6 +22,7 @@
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
 #include <TFT_eSPI.h>
+#include <PID_v1.h>
 
 // ============================================================================
 // HARDWARE OBJECTS
@@ -36,6 +37,29 @@ Adafruit_MAX31855 thermocouple(THERMOCOUPLE_CS);
 // Uses hardware SPI configured via platformio.ini build flags
 // Pins: CS=15, DC=2, RST=4, MOSI=23, SCK=18 (shared with MAX31855)
 TFT_eSPI tft = TFT_eSPI();
+
+// ============================================================================
+// PID CONTROLLER
+// ============================================================================
+
+// PID variables (must be double for PID library)
+double pidInput = 0;      // Current temperature
+double pidOutput = 0;     // PID output (0-100%)
+double pidSetpoint = 100; // Target temperature
+
+// PID tuning parameters (conservative starting values)
+double Kp = 5.0;   // Proportional gain
+double Ki = 0.5;   // Integral gain
+double Kd = 1.0;   // Derivative gain
+
+// Create PID controller instance
+// Parameters: &Input, &Output, &Setpoint, Kp, Ki, Kd, DIRECT
+// DIRECT means: increase output when below setpoint (heating mode)
+PID kilnPID(&pidInput, &pidOutput, &pidSetpoint, Kp, Ki, Kd, DIRECT);
+
+// SSR control variables for time-proportional control
+unsigned long ssrWindowSize = SSR_CYCLE_TIME_MS;  // 2 seconds from config.h
+unsigned long ssrWindowStartTime = 0;
 
 // ============================================================================
 // SYSTEM STATE
@@ -148,16 +172,16 @@ bool readTemperature() {
 // ============================================================================
 
 /**
- * Simple on/off control based on temperature
- * Implements basic hysteresis to prevent rapid cycling
+ * PID-based time-proportional SSR control
+ * Uses a time window to simulate analog output with digital SSR
  */
 void updateSSRControl() {
-    const float HYSTERESIS = 2.0;  // °C of hysteresis
-
-    // SAFETY: Don't heat if sensor error or in idle mode
-    if (state.sensorError || state.mode == MODE_IDLE) {
+    // SAFETY: Don't heat if sensor error
+    if (state.sensorError) {
         digitalWrite(SSR_PIN, LOW);
         state.heating = false;
+        kilnPID.SetMode(MANUAL);
+        pidOutput = 0;
         return;
     }
 
@@ -165,6 +189,8 @@ void updateSSRControl() {
     if (state.targetTemp > MAX_TEMP_LIMIT) {
         digitalWrite(SSR_PIN, LOW);
         state.heating = false;
+        kilnPID.SetMode(MANUAL);
+        pidOutput = 0;
         DEBUG_PRINTLN("[SAFETY] Target exceeds MAX_TEMP_LIMIT - heating disabled");
         return;
     }
@@ -173,28 +199,46 @@ void updateSSRControl() {
     if (state.currentTemp >= MAX_TEMP_LIMIT) {
         digitalWrite(SSR_PIN, LOW);
         state.heating = false;
+        kilnPID.SetMode(MANUAL);
+        pidOutput = 0;
         DEBUG_PRINTLN("[SAFETY] Current temp at/above MAX_TEMP_LIMIT - heating disabled");
         return;
     }
 
-    // Simple on/off control with hysteresis
-    if (state.currentTemp < (state.targetTemp - HYSTERESIS)) {
-        // Too cold, turn on heater
-        if (!state.heating) {
-            state.heating = true;
-            state.heatingStartTime = millis();
-            digitalWrite(SSR_PIN, HIGH);
-            DEBUG_PRINTLN("[SSR] Heating ON");
-        }
-    } else if (state.currentTemp > state.targetTemp) {
-        // At or above target, turn off heater
-        if (state.heating) {
-            state.heating = false;
-            digitalWrite(SSR_PIN, LOW);
-            DEBUG_PRINTLN("[SSR] Heating OFF");
-        }
+    // Update PID input and setpoint
+    pidInput = state.currentTemp;
+    pidSetpoint = state.targetTemp;
+
+    // Enable PID if not already enabled
+    if (kilnPID.GetMode() != AUTOMATIC) {
+        kilnPID.SetMode(AUTOMATIC);
+        ssrWindowStartTime = millis();
+        DEBUG_PRINTLN("[PID] PID controller enabled");
     }
-    // If temperature is between (target - hysteresis) and target, maintain current state
+
+    // Compute PID output
+    kilnPID.Compute();
+
+    // Time-proportional SSR control
+    // pidOutput is 0-100, representing percentage of time SSR should be ON
+    unsigned long now = millis();
+
+    // Check if we need to start a new SSR window
+    if (now - ssrWindowStartTime >= ssrWindowSize) {
+        ssrWindowStartTime = now;
+    }
+
+    // Calculate SSR on-time for this window
+    unsigned long onTime = (ssrWindowSize * pidOutput) / 100;
+
+    // Determine if SSR should be on or off in current window
+    if ((now - ssrWindowStartTime) < onTime) {
+        digitalWrite(SSR_PIN, HIGH);
+        state.heating = true;
+    } else {
+        digitalWrite(SSR_PIN, LOW);
+        state.heating = false;
+    }
 }
 
 // ============================================================================
@@ -1113,8 +1157,14 @@ void updateDisplay() {
     snprintf(tempStr, sizeof(tempStr), "%.0f", state.targetTemp);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.print(tempStr);
-    tft.drawCircle(280, 172, 5, TFT_WHITE);
+    tft.drawCircle(210, 172, 5, TFT_WHITE);
     tft.print("C");
+
+    // PID Output
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setCursor(10, 190);
+    tft.printf("PID Output: %.1f%%", pidOutput);
 
     // Instructions
     tft.drawLine(0, 200, 320, 200, TFT_DARKGREY);
@@ -1292,6 +1342,14 @@ void setup() {
 
     // Initialize test state
     initTestState();
+
+    // Initialize PID controller
+    kilnPID.SetOutputLimits(0, 100);  // Output is 0-100%
+    kilnPID.SetSampleTime(PID_SAMPLE_TIME);  // 1000ms from config.h
+    kilnPID.SetMode(MANUAL);  // Start in manual mode (off)
+    pidOutput = 0;
+    ssrWindowStartTime = millis();
+    Serial.println("[OK] PID controller initialized (Kp=5.0, Ki=0.5, Kd=1.0)");
 
     // Initialize SPI for shared bus (MAX31855 thermocouple uses software SPI)
     SPI.begin();
