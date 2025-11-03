@@ -251,6 +251,7 @@ const int numTestMenuItems = 10;
 
 /**
  * Display the hardware test menu
+ * Landscape mode: 320x240
  */
 void displayTestMenu() {
     tft.fillScreen(TFT_BLACK);
@@ -258,20 +259,20 @@ void displayTestMenu() {
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.setCursor(10, 10);
     tft.println("HARDWARE TEST");
-    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+    tft.drawLine(0, 35, 320, 35, TFT_WHITE);
 
     tft.setTextSize(1);
 
-    // Show menu items (5 at a time)
-    int startIdx = max(0, testState.menuSelection - 2);
-    int endIdx = min(numTestMenuItems, startIdx + 6);
+    // Show menu items (8 at a time in landscape)
+    int startIdx = max(0, testState.menuSelection - 3);
+    int endIdx = min(numTestMenuItems, startIdx + 8);
 
     for (int i = startIdx; i < endIdx; i++) {
-        int yPos = 50 + (i - startIdx) * 20;
+        int yPos = 45 + (i - startIdx) * 20;
 
         if (i == testState.menuSelection) {
             // Highlight selected item
-            tft.fillRect(0, yPos - 2, 240, 18, TFT_DARKGREEN);
+            tft.fillRect(0, yPos - 2, 320, 18, TFT_DARKGREEN);
             tft.setTextColor(TFT_WHITE, TFT_DARKGREEN);
         } else {
             tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -283,14 +284,13 @@ void displayTestMenu() {
 
     // Instructions at bottom
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.setCursor(10, 280);
-    tft.print("Turn: Navigate");
-    tft.setCursor(10, 295);
-    tft.print("Press: Select");
+    tft.setCursor(10, 215);
+    tft.print("Turn: Navigate    Press: Select");
 }
 
 /**
  * Show test running screen
+ * Landscape mode: 320x240
  */
 void displayTestRunning(const char* testName, const char* message, bool inProgress = true) {
     tft.fillScreen(TFT_BLACK);
@@ -298,7 +298,7 @@ void displayTestRunning(const char* testName, const char* message, bool inProgre
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.setCursor(10, 10);
     tft.println(testName);
-    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+    tft.drawLine(0, 35, 320, 35, TFT_WHITE);
 
     tft.setTextSize(1);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
@@ -308,7 +308,7 @@ void displayTestRunning(const char* testName, const char* message, bool inProgre
     int lineY = 50;
     char* msg = strdup(message);
     char* line = strtok(msg, "\n");
-    while (line != NULL && lineY < 250) {
+    while (line != NULL && lineY < 200) {
         tft.setCursor(10, lineY);
         tft.println(line);
         lineY += 15;
@@ -320,7 +320,7 @@ void displayTestRunning(const char* testName, const char* message, bool inProgre
         // Show progress indicator
         int dotCount = (millis() / 500) % 4;
         tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.setCursor(10, 280);
+        tft.setCursor(10, 220);
         tft.print("Testing");
         for (int i = 0; i < dotCount; i++) {
             tft.print(".");
@@ -330,16 +330,17 @@ void displayTestRunning(const char* testName, const char* message, bool inProgre
 
 /**
  * Show test results
+ * Landscape mode: 320x240
  */
 void displayTestResult(const char* testName, bool passed, const char* details = "") {
     tft.fillScreen(passed ? TFT_DARKGREEN : TFT_MAROON);
-    tft.setTextSize(3);
+    tft.setTextSize(2);
     tft.setTextColor(TFT_WHITE, passed ? TFT_DARKGREEN : TFT_MAROON);
-    tft.setCursor(10, 50);
+    tft.setCursor(10, 20);
     tft.println(testName);
 
-    tft.setTextSize(4);
-    tft.setCursor(10, 120);
+    tft.setTextSize(5);
+    tft.setCursor(100, 80);
     if (passed) {
         tft.setTextColor(TFT_GREEN, TFT_DARKGREEN);
         tft.println("PASS");
@@ -351,12 +352,12 @@ void displayTestResult(const char* testName, bool passed, const char* details = 
     if (strlen(details) > 0) {
         tft.setTextSize(1);
         tft.setTextColor(TFT_WHITE, passed ? TFT_DARKGREEN : TFT_MAROON);
-        tft.setCursor(10, 180);
+        tft.setCursor(10, 160);
         tft.println(details);
     }
 
     tft.setTextSize(1);
-    tft.setCursor(10, 295);
+    tft.setCursor(10, 220);
     tft.print("Press any button...");
 }
 
@@ -700,6 +701,7 @@ void runThermocoupleTest() {
             Serial.println("[DEBUG] About to update TFT display...");
 
             // Update display ONLY when we have new temperature data
+            // Landscape mode: 320x240
             Serial.println("[DEBUG] Clearing TFT screen...");
             tft.fillScreen(TFT_BLACK);
 
@@ -707,12 +709,12 @@ void runThermocoupleTest() {
             tft.setTextSize(2);
             tft.setTextColor(TFT_CYAN, TFT_BLACK);
             tft.setCursor(10, 10);
-            tft.println("Thermocouple");
-            tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+            tft.println("Thermocouple Test");
+            tft.drawLine(0, 35, 320, 35, TFT_WHITE);
 
-            // Current reading - LARGE
+            // Current reading - LARGE (left side)
             Serial.printf("[DEBUG] Drawing temperature: %.1f°F\n", currentTemp);
-            tft.setTextSize(5);
+            tft.setTextSize(4);
             if (currentTemp == -999) {
                 tft.setTextColor(TFT_RED, TFT_BLACK);
                 tft.setCursor(10, 60);
@@ -723,15 +725,15 @@ void runThermocoupleTest() {
                 char tempStr[20];
                 snprintf(tempStr, sizeof(tempStr), "%.1f", currentTemp);
                 tft.print(tempStr);
-                tft.setTextSize(3);
-                tft.print("F");
+                tft.setTextSize(2);
+                tft.print(" F");
             }
             Serial.println("[DEBUG] Temperature drawn.");
 
-            // Statistics
+            // Statistics (right side)
             tft.setTextSize(1);
             tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-            tft.setCursor(10, 140);
+            tft.setCursor(10, 120);
             tft.print("Min: ");
             if (minTemp < 9999) {
                 tft.printf("%.1f F", minTemp);
@@ -739,7 +741,7 @@ void runThermocoupleTest() {
                 tft.print("---");
             }
 
-            tft.setCursor(10, 160);
+            tft.setCursor(120, 120);
             tft.print("Max: ");
             if (maxTemp > -9999) {
                 tft.printf("%.1f F", maxTemp);
@@ -749,29 +751,25 @@ void runThermocoupleTest() {
 
             if (goodSamples > 0) {
                 double avgTemp = totalTemp / goodSamples;
-                tft.setCursor(10, 180);
+                tft.setCursor(10, 140);
                 tft.print("Avg: ");
                 tft.printf("%.1f F", avgTemp);
             }
 
             tft.setTextColor(TFT_GREEN, TFT_BLACK);
-            tft.setCursor(10, 210);
+            tft.setCursor(10, 160);
             tft.printf("Good: %d  Errors: %d", goodSamples, errorSamples);
 
             // Exit instructions
-            tft.drawLine(0, 240, 240, 240, TFT_DARKGREY);
+            tft.drawLine(0, 190, 320, 190, TFT_DARKGREY);
             tft.setTextColor(TFT_ORANGE, TFT_BLACK);
-            tft.setCursor(10, 250);
-            tft.println("To exit:");
-            tft.setCursor(10, 265);
+            tft.setCursor(10, 200);
             if (rightPressed) {
                 tft.setTextColor(TFT_GREEN, TFT_BLACK);
-                tft.println("Now press LEFT!");
+                tft.print("To exit: Now press LEFT!");
             } else {
                 tft.setTextColor(TFT_ORANGE, TFT_BLACK);
-                tft.println("1. Press RIGHT");
-                tft.setCursor(10, 280);
-                tft.println("2. Press LEFT");
+                tft.print("To exit: 1. Press RIGHT  2. Press LEFT");
             }
 
             Serial.println("[DEBUG] TFT display update complete!");
@@ -822,6 +820,7 @@ void runThermocoupleTest() {
 
 /**
  * Run display test
+ * Landscape mode: 320x240
  */
 void runDisplayTest() {
     // Colors
@@ -832,12 +831,12 @@ void runDisplayTest() {
     tft.fillScreen(TFT_BLUE);
     delay(500);
 
-    // Graphics
+    // Graphics - adjusted for landscape 320x240
     tft.fillScreen(TFT_BLACK);
-    tft.drawRect(20, 20, 200, 280, TFT_WHITE);
-    tft.fillCircle(120, 160, 50, TFT_YELLOW);
-    tft.drawLine(20, 20, 220, 300, TFT_RED);
-    tft.drawLine(220, 20, 20, 300, TFT_GREEN);
+    tft.drawRect(20, 20, 280, 200, TFT_WHITE);
+    tft.fillCircle(160, 120, 50, TFT_YELLOW);
+    tft.drawLine(20, 20, 300, 220, TFT_RED);
+    tft.drawLine(300, 20, 20, 220, TFT_GREEN);
     delay(2000);
 
     displayTestResult("TFT Display", true, "Colors & graphics\ndisplayed");
@@ -918,6 +917,7 @@ void handleTestModeInput() {
 
 /**
  * Update TFT display with current system state
+ * Landscape mode: 320x240
  */
 void updateDisplay() {
     // Clear screen
@@ -937,35 +937,35 @@ void updateDisplay() {
     // Heating indicator
     if (state.heating) {
         tft.setTextColor(TFT_RED, TFT_BLACK);
-        tft.setCursor(130, 10);
+        tft.setCursor(230, 10);
         tft.print("HEAT");
     }
 
-    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+    tft.drawLine(0, 35, 320, 35, TFT_WHITE);
 
     // Current Temperature (large)
     tft.setTextSize(6);
     char tempStr[20];
     if (state.sensorError) {
         tft.setTextColor(TFT_RED, TFT_BLACK);
-        tft.setCursor(10, 60);
+        tft.setCursor(20, 70);
         tft.setTextSize(3);
         tft.print("SENSOR ERROR!");
     } else {
         tft.setTextColor(TFT_WHITE, TFT_BLACK);
-        tft.setCursor(10, 60);
+        tft.setCursor(20, 70);
         snprintf(tempStr, sizeof(tempStr), "%.1f", state.currentTemp);
         tft.print(tempStr);
 
         // Degree symbol and C
         tft.setTextSize(3);
-        tft.drawCircle(210, 70, 8, TFT_WHITE);
-        tft.setCursor(205, 90);
+        tft.drawCircle(280, 80, 8, TFT_WHITE);
+        tft.setCursor(275, 100);
         tft.print("C");
     }
 
     // Target Temperature
-    tft.drawLine(0, 150, 240, 150, TFT_DARKGREY);
+    tft.drawLine(0, 150, 320, 150, TFT_DARKGREY);
     tft.setTextSize(2);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
     tft.setCursor(10, 165);
@@ -973,18 +973,16 @@ void updateDisplay() {
     snprintf(tempStr, sizeof(tempStr), "%.0f", state.targetTemp);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.print(tempStr);
-    tft.drawCircle(210, 172, 5, TFT_WHITE);
+    tft.drawCircle(280, 172, 5, TFT_WHITE);
     tft.print("C");
 
     // Instructions
-    tft.drawLine(0, 250, 240, 250, TFT_DARKGREY);
+    tft.drawLine(0, 200, 320, 200, TFT_DARKGREY);
     tft.setTextSize(1);
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
-    tft.setCursor(10, 265);
-    tft.print("L: Mode");
-    tft.setCursor(10, 280);
-    tft.print("R: Setpoint");
-    tft.setCursor(10, 295);
+    tft.setCursor(10, 210);
+    tft.print("L: Mode    R: Setpoint");
+    tft.setCursor(10, 225);
     tft.setTextColor(TFT_ORANGE, TFT_BLACK);
     tft.print("Both: Emergency Stop");
 }
@@ -1173,22 +1171,20 @@ void setup() {
 
     // Initialize TFT display
     tft.init();
-    tft.setRotation(0);  // Portrait mode
+    tft.setRotation(1);  // Landscape mode (320x240)
     tft.fillScreen(TFT_BLACK);
     tft.setTextColor(TFT_WHITE, TFT_BLACK);
     tft.setTextSize(3);
-    tft.setCursor(20, 80);
-    tft.println("Kiln");
-    tft.setCursor(20, 120);
-    tft.println("Controller");
+    tft.setCursor(60, 60);
+    tft.println("Kiln Controller");
     tft.setTextSize(1);
     tft.setTextColor(TFT_CYAN, TFT_BLACK);
-    tft.setCursor(10, 180);
+    tft.setCursor(10, 140);
     tft.println("Initializing...");
 
     // Show hardware test mode message
     tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.setCursor(10, 220);
+    tft.setCursor(10, 170);
     tft.println("HARDWARE TEST MODE");
 
     Serial.println("[OK] TFT display initialized");

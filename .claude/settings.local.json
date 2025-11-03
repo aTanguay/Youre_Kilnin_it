@@ -6,7 +6,8 @@
       "Bash(where:*)",
       "Bash(~/.platformio/penv/Scripts/platformio.exe run -e esp32dev)",
       "Bash(git add:*)",
-      "Bash(git commit:*)"
+      "Bash(git commit:*)",
+      "Bash(git push)"
     ],
     "deny": [],
     "ask": []
