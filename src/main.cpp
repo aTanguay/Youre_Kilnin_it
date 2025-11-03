@@ -42,9 +42,12 @@ TFT_eSPI tft = TFT_eSPI();
 // ============================================================================
 
 enum SystemMode {
-    MODE_IDLE,      // System idle, not heating
-    MODE_MANUAL,    // Manual heating mode (simple on/off)
-    MODE_TEST       // Hardware test mode
+    MODE_MAIN_MENU,     // Top-level menu
+    MODE_MANUAL,        // Manual heating mode (simple on/off)
+    MODE_PROFILE,       // Profile-based firing (future)
+    MODE_SETTINGS,      // Settings menu (future)
+    MODE_TEST,          // Hardware test mode
+    MODE_IDLE           // System idle, not heating
 };
 
 struct SystemState {
@@ -192,6 +195,147 @@ void updateSSRControl() {
         }
     }
     // If temperature is between (target - hysteresis) and target, maintain current state
+}
+
+// ============================================================================
+// FORWARD DECLARATIONS
+// ============================================================================
+
+void displayTestMenu();
+void initTestState();
+
+// ============================================================================
+// MAIN MENU SYSTEM
+// ============================================================================
+
+enum MainMenuItem {
+    MAIN_MENU_MANUAL,
+    MAIN_MENU_PROFILES,
+    MAIN_MENU_SETTINGS,
+    MAIN_MENU_HARDWARE_TEST,
+    MAIN_MENU_ABOUT
+};
+
+struct MainMenuState {
+    int selection;
+};
+
+MainMenuState mainMenu = {0};
+
+const char* mainMenuItems[] = {
+    "Manual Control",
+    "Firing Profiles",
+    "Settings",
+    "Hardware Test",
+    "About"
+};
+const int numMainMenuItems = 5;
+
+/**
+ * Display main menu
+ * Landscape mode: 320x240
+ */
+void displayMainMenu() {
+    tft.fillScreen(TFT_BLACK);
+
+    // Header
+    tft.setTextSize(3);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(30, 10);
+    tft.println("Kiln Controller");
+    tft.drawLine(0, 45, 320, 45, TFT_WHITE);
+
+    tft.setTextSize(2);
+
+    // Menu items
+    for (int i = 0; i < numMainMenuItems; i++) {
+        int yPos = 65 + (i * 30);
+
+        if (i == mainMenu.selection) {
+            // Highlight selected item
+            tft.fillRect(0, yPos - 2, 320, 26, TFT_DARKGREEN);
+            tft.setTextColor(TFT_WHITE, TFT_DARKGREEN);
+        } else {
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        }
+
+        tft.setCursor(20, yPos);
+        tft.print(mainMenuItems[i]);
+    }
+
+    // Instructions
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setCursor(10, 220);
+    tft.print("Turn: Navigate    Press: Select");
+}
+
+/**
+ * Handle main menu input
+ */
+void handleMainMenuInput() {
+    int clk = digitalRead(ENCODER_LEFT_CLK_PIN);
+    static int lastCLK = HIGH;
+
+    // Navigate menu - only on FALLING edge
+    if (clk != lastCLK && clk == LOW) {
+        int dt = digitalRead(ENCODER_LEFT_DT_PIN);
+        if (dt == LOW) {
+            // Clockwise - down
+            mainMenu.selection++;
+            if (mainMenu.selection >= numMainMenuItems) {
+                mainMenu.selection = 0;
+            }
+        } else {
+            // Counter-clockwise - up
+            mainMenu.selection--;
+            if (mainMenu.selection < 0) {
+                mainMenu.selection = numMainMenuItems - 1;
+            }
+        }
+        displayMainMenu();
+        playTone(1200, 20);
+    }
+    lastCLK = clk;
+
+    // Select menu item
+    int sw = digitalRead(ENCODER_LEFT_SW_PIN);
+    static int lastSW = HIGH;
+    static unsigned long lastPress = 0;
+
+    if (sw != lastSW && sw == LOW) {
+        if (millis() - lastPress > 200) {
+            lastPress = millis();
+            playTone(2000, 50);
+
+            // Execute selected menu item
+            switch (mainMenu.selection) {
+                case MAIN_MENU_MANUAL:
+                    state.mode = MODE_MANUAL;
+                    state.targetTemp = 100.0;
+                    state.heating = false;
+                    break;
+                case MAIN_MENU_PROFILES:
+                    // TODO: Implement profiles
+                    playTone(500, 100); // Error beep
+                    break;
+                case MAIN_MENU_SETTINGS:
+                    // TODO: Implement settings
+                    playTone(500, 100); // Error beep
+                    break;
+                case MAIN_MENU_HARDWARE_TEST:
+                    state.mode = MODE_TEST;
+                    initTestState();
+                    displayTestMenu();
+                    break;
+                case MAIN_MENU_ABOUT:
+                    // TODO: Show about screen
+                    playTone(500, 100); // Error beep
+                    break;
+            }
+        }
+    }
+    lastSW = sw;
 }
 
 // ============================================================================
@@ -903,7 +1047,8 @@ void handleTestModeInput() {
                 case 7: runThermocoupleTest(); displayTestMenu(); break;
                 case 8: runDisplayTest(); displayTestMenu(); break;
                 case 9: // Exit
-                    state.mode = MODE_IDLE;
+                    state.mode = MODE_MAIN_MENU;
+                    displayMainMenu();
                     break;
             }
         }
@@ -926,13 +1071,8 @@ void updateDisplay() {
     // Header - Show current mode
     tft.setTextSize(2);
     tft.setCursor(10, 10);
-    if (state.mode == MODE_IDLE) {
-        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-        tft.print("IDLE");
-    } else {
-        tft.setTextColor(TFT_GREEN, TFT_BLACK);
-        tft.print("MANUAL");
-    }
+    tft.setTextColor(TFT_GREEN, TFT_BLACK);
+    tft.print("MANUAL CONTROL");
 
     // Heating indicator
     if (state.heating) {
@@ -981,10 +1121,10 @@ void updateDisplay() {
     tft.setTextSize(1);
     tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
     tft.setCursor(10, 210);
-    tft.print("L: Mode    R: Setpoint");
+    tft.print("L Press: Menu    R Turn: Setpoint");
     tft.setCursor(10, 225);
     tft.setTextColor(TFT_ORANGE, TFT_BLACK);
-    tft.print("Both: Emergency Stop");
+    tft.print("Both Hold: Emergency Stop");
 }
 
 // ============================================================================
@@ -992,33 +1132,25 @@ void updateDisplay() {
 // ============================================================================
 
 /**
- * Handle left encoder (mode selection)
+ * Handle left encoder (back to menu / mode selection)
  */
 void handleLeftEncoder() {
     int clk = digitalRead(ENCODER_LEFT_CLK_PIN);
     int dt = digitalRead(ENCODER_LEFT_DT_PIN);
     int sw = digitalRead(ENCODER_LEFT_SW_PIN);
 
-    // Rotation detection
-    if (clk != leftEncoder.lastCLK) {
-        // Encoder turned - toggle mode
-        if (state.mode == MODE_IDLE) {
-            state.mode = MODE_MANUAL;
-            DEBUG_PRINTLN("[MODE] Switched to MANUAL");
-            playTone(1500, 50);
-        } else {
-            state.mode = MODE_IDLE;
-            DEBUG_PRINTLN("[MODE] Switched to IDLE");
-            playTone(1000, 50);
-        }
-        leftEncoder.lastCLK = clk;
-    }
-
-    // Button press detection (for future use)
+    // Button press detection - back to main menu
     if (sw != leftEncoder.lastSW && sw == LOW) {
         unsigned long now = millis();
         if (now - leftEncoder.lastButtonPress > DEBOUNCE_MS) {
-            DEBUG_PRINTLN("[LEFT] Button pressed");
+            DEBUG_PRINTLN("[LEFT] Button pressed - returning to main menu");
+
+            // Safety: Turn off heating when returning to menu
+            digitalWrite(SSR_PIN, LOW);
+            state.heating = false;
+
+            state.mode = MODE_MAIN_MENU;
+            displayMainMenu();
             playTone(2000, 30);
             leftEncoder.lastButtonPress = now;
         }
@@ -1182,34 +1314,27 @@ void setup() {
     tft.setCursor(10, 140);
     tft.println("Initializing...");
 
-    // Show hardware test mode message
-    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
-    tft.setCursor(10, 170);
-    tft.println("HARDWARE TEST MODE");
-
     Serial.println("[OK] TFT display initialized");
 
     delay(2000);  // Show splash screen
 
-    // ALWAYS enter hardware test mode
+    // Start with main menu
     Serial.println();
     Serial.println("========================================");
-    Serial.println("HARDWARE TEST MODE");
+    Serial.println("MAIN MENU");
     Serial.println("========================================");
     Serial.println();
 
-    state.mode = MODE_TEST;
-    playTone(1500, 200);
-    delay(100);
-    playTone(2000, 200);
+    state.mode = MODE_MAIN_MENU;
+    playTone(1500, 100);
 
-    Serial.println("[MODE] Entering HARDWARE TEST mode");
+    Serial.println("[MODE] Starting at MAIN MENU");
     Serial.println();
     Serial.println("Use LEFT encoder to navigate menu");
-    Serial.println("Press LEFT encoder button to select test");
+    Serial.println("Press LEFT encoder button to select");
     Serial.println();
 
-    displayTestMenu();
+    displayMainMenu();
 
     state.lastTempRead = millis();
     state.lastDisplayUpdate = millis();
@@ -1222,6 +1347,13 @@ void setup() {
 void loop() {
     unsigned long now = millis();
 
+    // Handle main menu
+    if (state.mode == MODE_MAIN_MENU) {
+        handleMainMenuInput();
+        delay(10);
+        return;
+    }
+
     // Handle test mode
     if (state.mode == MODE_TEST) {
         handleTestModeInput();
@@ -1229,7 +1361,7 @@ void loop() {
         return;
     }
 
-    // Normal operation mode (IDLE or MANUAL)
+    // Handle manual control mode
 
     // Read temperature (every 100ms)
     if (now - state.lastTempRead >= 100) {
