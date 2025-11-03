@@ -19,24 +19,23 @@
 
 #include <Arduino.h>
 #include "config.h"
-// Note: SPI.h not needed - using software SPI for both MAX31855 and LCD
+#include <SPI.h>
 #include <Adafruit_MAX31855.h>
-#include <U8g2lib.h>
+#include <TFT_eSPI.h>
 
 // ============================================================================
 // HARDWARE OBJECTS
 // ============================================================================
 
-// Thermocouple using SOFTWARE SPI
-// Constructor: Adafruit_MAX31855(SCLK, CS, MISO)
-// We use software SPI to match the LCD's software SPI implementation
-// Pins: CLK=18, CS=5, MISO=19
-Adafruit_MAX31855 thermocouple(THERMOCOUPLE_CLK, THERMOCOUPLE_CS, THERMOCOUPLE_MISO);
+// Thermocouple using HARDWARE SPI (shares bus with TFT)
+// Constructor: Adafruit_MAX31855(CS pin) - uses hardware SPI
+// Pins: Hardware SPI uses CLK=18, MISO=19 automatically, CS=5
+Adafruit_MAX31855 thermocouple(THERMOCOUPLE_CS);
 
-// LCD Display using SOFTWARE SPI (ST7920)
-// U8g2 constructor order: (rotation, SCK, MOSI, CS)
-// Pins: SCK=18 (shared clock), MOSI=23, CS=15
-U8G2_ST7920_128X64_F_SW_SPI display(U8G2_R0, LCD_SCK, LCD_MOSI, LCD_CS);
+// TFT Display (ILI9341)
+// Uses hardware SPI configured via platformio.ini build flags
+// Pins: CS=15, DC=2, RST=4, MOSI=23, SCK=18 (shared with MAX31855)
+TFT_eSPI tft = TFT_eSPI();
 
 // ============================================================================
 // SYSTEM STATE
@@ -44,7 +43,8 @@ U8G2_ST7920_128X64_F_SW_SPI display(U8G2_R0, LCD_SCK, LCD_MOSI, LCD_CS);
 
 enum SystemMode {
     MODE_IDLE,      // System idle, not heating
-    MODE_MANUAL     // Manual heating mode (simple on/off)
+    MODE_MANUAL,    // Manual heating mode (simple on/off)
+    MODE_TEST       // Hardware test mode
 };
 
 struct SystemState {
@@ -195,61 +195,798 @@ void updateSSRControl() {
 }
 
 // ============================================================================
+// HARDWARE TEST MODE
+// ============================================================================
+
+enum TestMenuItem {
+    TEST_MENU_MAIN,
+    TEST_ALL,
+    TEST_LEDS,
+    TEST_BUZZER,
+    TEST_LEFT_ENCODER,
+    TEST_RIGHT_ENCODER,
+    TEST_EMERGENCY_STOP,
+    TEST_SSR,
+    TEST_THERMOCOUPLE,
+    TEST_DISPLAY,
+    TEST_EXIT
+};
+
+struct TestState {
+    TestMenuItem currentTest;
+    int menuSelection;
+    bool testRunning;
+    unsigned long testStartTime;
+    int testProgress;
+    char testMessage[100];
+    bool testPassed;
+};
+
+TestState testState;
+
+void initTestState() {
+    testState.currentTest = TEST_MENU_MAIN;
+    testState.menuSelection = 0;
+    testState.testRunning = false;
+    testState.testStartTime = 0;
+    testState.testProgress = 0;
+    strcpy(testState.testMessage, "");
+    testState.testPassed = false;
+}
+
+// Test menu items
+const char* testMenuItems[] = {
+    "Run All Tests",
+    "1. Status LEDs",
+    "2. Buzzer",
+    "3. Left Encoder",
+    "4. Right Encoder",
+    "5. Emergency Stop",
+    "6. SSR Output",
+    "7. Thermocouple",
+    "8. TFT Display",
+    "Exit Test Mode"
+};
+const int numTestMenuItems = 10;
+
+/**
+ * Display the hardware test menu
+ */
+void displayTestMenu() {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(10, 10);
+    tft.println("HARDWARE TEST");
+    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+
+    tft.setTextSize(1);
+
+    // Show menu items (5 at a time)
+    int startIdx = max(0, testState.menuSelection - 2);
+    int endIdx = min(numTestMenuItems, startIdx + 6);
+
+    for (int i = startIdx; i < endIdx; i++) {
+        int yPos = 50 + (i - startIdx) * 20;
+
+        if (i == testState.menuSelection) {
+            // Highlight selected item
+            tft.fillRect(0, yPos - 2, 240, 18, TFT_DARKGREEN);
+            tft.setTextColor(TFT_WHITE, TFT_DARKGREEN);
+        } else {
+            tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        }
+
+        tft.setCursor(10, yPos);
+        tft.print(testMenuItems[i]);
+    }
+
+    // Instructions at bottom
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setCursor(10, 280);
+    tft.print("Turn: Navigate");
+    tft.setCursor(10, 295);
+    tft.print("Press: Select");
+}
+
+/**
+ * Show test running screen
+ */
+void displayTestRunning(const char* testName, const char* message, bool inProgress = true) {
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(10, 10);
+    tft.println(testName);
+    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setCursor(10, 50);
+
+    // Word wrap the message
+    int lineY = 50;
+    char* msg = strdup(message);
+    char* line = strtok(msg, "\n");
+    while (line != NULL && lineY < 250) {
+        tft.setCursor(10, lineY);
+        tft.println(line);
+        lineY += 15;
+        line = strtok(NULL, "\n");
+    }
+    free(msg);
+
+    if (inProgress) {
+        // Show progress indicator
+        int dotCount = (millis() / 500) % 4;
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.setCursor(10, 280);
+        tft.print("Testing");
+        for (int i = 0; i < dotCount; i++) {
+            tft.print(".");
+        }
+    }
+}
+
+/**
+ * Show test results
+ */
+void displayTestResult(const char* testName, bool passed, const char* details = "") {
+    tft.fillScreen(passed ? TFT_DARKGREEN : TFT_MAROON);
+    tft.setTextSize(3);
+    tft.setTextColor(TFT_WHITE, passed ? TFT_DARKGREEN : TFT_MAROON);
+    tft.setCursor(10, 50);
+    tft.println(testName);
+
+    tft.setTextSize(4);
+    tft.setCursor(10, 120);
+    if (passed) {
+        tft.setTextColor(TFT_GREEN, TFT_DARKGREEN);
+        tft.println("PASS");
+    } else {
+        tft.setTextColor(TFT_RED, TFT_MAROON);
+        tft.println("FAIL");
+    }
+
+    if (strlen(details) > 0) {
+        tft.setTextSize(1);
+        tft.setTextColor(TFT_WHITE, passed ? TFT_DARKGREEN : TFT_MAROON);
+        tft.setCursor(10, 180);
+        tft.println(details);
+    }
+
+    tft.setTextSize(1);
+    tft.setCursor(10, 295);
+    tft.print("Press any button...");
+}
+
+/**
+ * Wait for any button press (with debouncing)
+ */
+void waitForButtonPress() {
+    Serial.println("[WAIT] Waiting for button press...");
+
+    // First check what state the buttons are in
+    int leftInitial = digitalRead(ENCODER_LEFT_SW_PIN);
+    int rightInitial = digitalRead(ENCODER_RIGHT_SW_PIN);
+    Serial.printf("[DEBUG] Initial button states - Left: %s, Right: %s\n",
+                  leftInitial == HIGH ? "HIGH" : "LOW",
+                  rightInitial == HIGH ? "HIGH" : "LOW");
+
+    // Clear any pending button presses
+    delay(500);
+
+    unsigned long startTime = millis();
+    int checkCount = 0;
+
+    while (true) {
+        int leftSW = digitalRead(ENCODER_LEFT_SW_PIN);
+        int rightSW = digitalRead(ENCODER_RIGHT_SW_PIN);
+
+        // Debug output every second
+        if (checkCount % 100 == 0) {
+            Serial.printf("[DEBUG] Buttons - Left: %s, Right: %s (%.1fs waiting)\n",
+                          leftSW == HIGH ? "HIGH" : "LOW",
+                          rightSW == HIGH ? "HIGH" : "LOW",
+                          (millis() - startTime) / 1000.0);
+        }
+        checkCount++;
+
+        // Try detecting button press (LOW = pressed for most encoders)
+        if (leftSW == LOW) {
+            Serial.println("[BUTTON] Left button detected as LOW (pressed)!");
+            playTone(1500, 50);
+            // Wait for release
+            while (digitalRead(ENCODER_LEFT_SW_PIN) == LOW) {
+                delay(10);
+            }
+            delay(200);  // Debounce
+            return;
+        }
+
+        if (rightSW == LOW) {
+            Serial.println("[BUTTON] Right button detected as LOW (pressed)!");
+            playTone(1500, 50);
+            // Wait for release
+            while (digitalRead(ENCODER_RIGHT_SW_PIN) == LOW) {
+                delay(10);
+            }
+            delay(200);  // Debounce
+            return;
+        }
+
+        delay(10);
+    }
+}
+
+/**
+ * Run LED test
+ */
+void runLEDTest() {
+    displayTestRunning("Status LEDs", "Testing Power,\nWiFi, and Error\nLEDs...");
+
+    // Test each LED
+    digitalWrite(LED_POWER_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED_POWER_PIN, LOW);
+
+    digitalWrite(LED_WIFI_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED_WIFI_PIN, LOW);
+
+    digitalWrite(LED_ERROR_PIN, HIGH);
+    delay(1000);
+    digitalWrite(LED_ERROR_PIN, LOW);
+
+    displayTestResult("Status LEDs", true, "All LEDs blinked");
+    waitForButtonPress();
+}
+
+/**
+ * Run buzzer test
+ */
+void runBuzzerTest() {
+    displayTestRunning("Buzzer Test", "Playing test\ntones...");
+
+    playTone(1000, 200);
+    delay(300);
+    playTone(1500, 500);
+    delay(300);
+    playTone(2000, 200);
+
+    displayTestResult("Buzzer", true, "3 tones played");
+    waitForButtonPress();
+}
+
+/**
+ * Run left encoder test
+ */
+void runLeftEncoderTest() {
+    displayTestRunning("Left Encoder", "Rotate left encoder\nPress to continue\n\n10 seconds...");
+
+    int lastCLK = digitalRead(ENCODER_LEFT_CLK_PIN);
+    int cwCount = 0, ccwCount = 0, pressCount = 0;
+    unsigned long startTime = millis();
+    unsigned long lastRotation = 0;
+
+    while (millis() - startTime < 10000) {
+        int clk = digitalRead(ENCODER_LEFT_CLK_PIN);
+        int dt = digitalRead(ENCODER_LEFT_DT_PIN);
+        int sw = digitalRead(ENCODER_LEFT_SW_PIN);
+
+        // Only detect on FALLING edge of CLK with debounce delay
+        if (clk == LOW && lastCLK == HIGH) {
+            // Debounce: ignore if less than 5ms since last rotation
+            if (millis() - lastRotation > 5) {
+                delay(1);  // Small delay to let DT settle
+                dt = digitalRead(ENCODER_LEFT_DT_PIN);  // Re-read DT after settle
+
+                if (dt == LOW) {
+                    cwCount++;
+                    Serial.printf("[LEFT ENC] Clockwise - CW:%d CCW:%d\n", cwCount, ccwCount);
+                } else {
+                    ccwCount++;
+                    Serial.printf("[LEFT ENC] Counter-clockwise - CW:%d CCW:%d\n", cwCount, ccwCount);
+                }
+
+                lastRotation = millis();
+
+                char msg[100];
+                snprintf(msg, sizeof(msg), "Rotate left encoder\nCW: %d  CCW: %d\nPress: %d\n\n%d sec left",
+                         cwCount, ccwCount, pressCount, (int)((10000 - (millis() - startTime)) / 1000));
+                displayTestRunning("Left Encoder", msg);
+            }
+        }
+        lastCLK = clk;
+
+        static int lastSW = HIGH;
+        if (sw != lastSW && sw == LOW) {
+            pressCount++;
+            Serial.printf("[LEFT ENC] Button pressed - Count:%d\n", pressCount);
+            char msg[100];
+            snprintf(msg, sizeof(msg), "Rotate left encoder\nCW: %d  CCW: %d\nPress: %d\n\n%d sec left",
+                     cwCount, ccwCount, pressCount, (int)((10000 - (millis() - startTime)) / 1000));
+            displayTestRunning("Left Encoder", msg);
+        }
+        lastSW = sw;
+
+        delay(1);  // Small delay for stability
+    }
+
+    bool passed = (cwCount > 0 || ccwCount > 0 || pressCount > 0);
+    char details[100];
+    snprintf(details, sizeof(details), "CW:%d CCW:%d Press:%d", cwCount, ccwCount, pressCount);
+    displayTestResult("Left Encoder", passed, details);
+    waitForButtonPress();
+}
+
+/**
+ * Run right encoder test
+ */
+void runRightEncoderTest() {
+    displayTestRunning("Right Encoder", "Rotate right encoder\nPress to continue\n\n10 seconds...");
+
+    int lastCLK = digitalRead(ENCODER_RIGHT_CLK_PIN);
+    int cwCount = 0, ccwCount = 0, pressCount = 0;
+    unsigned long startTime = millis();
+    unsigned long lastRotation = 0;
+
+    while (millis() - startTime < 10000) {
+        int clk = digitalRead(ENCODER_RIGHT_CLK_PIN);
+        int dt = digitalRead(ENCODER_RIGHT_DT_PIN);
+        int sw = digitalRead(ENCODER_RIGHT_SW_PIN);
+
+        // Only detect on FALLING edge of CLK with debounce delay
+        if (clk == LOW && lastCLK == HIGH) {
+            // Debounce: ignore if less than 5ms since last rotation
+            if (millis() - lastRotation > 5) {
+                delay(1);  // Small delay to let DT settle
+                dt = digitalRead(ENCODER_RIGHT_DT_PIN);  // Re-read DT after settle
+
+                if (dt == LOW) {
+                    cwCount++;
+                    Serial.printf("[RIGHT ENC] Clockwise - CW:%d CCW:%d\n", cwCount, ccwCount);
+                } else {
+                    ccwCount++;
+                    Serial.printf("[RIGHT ENC] Counter-clockwise - CW:%d CCW:%d\n", cwCount, ccwCount);
+                }
+
+                lastRotation = millis();
+
+                char msg[100];
+                snprintf(msg, sizeof(msg), "Rotate right encoder\nCW: %d  CCW: %d\nPress: %d\n\n%d sec left",
+                         cwCount, ccwCount, pressCount, (int)((10000 - (millis() - startTime)) / 1000));
+                displayTestRunning("Right Encoder", msg);
+            }
+        }
+        lastCLK = clk;
+
+        static int lastSW = HIGH;
+        if (sw != lastSW && sw == LOW) {
+            pressCount++;
+            Serial.printf("[RIGHT ENC] Button pressed - Count:%d\n", pressCount);
+            char msg[100];
+            snprintf(msg, sizeof(msg), "Rotate right encoder\nCW: %d  CCW: %d\nPress: %d\n\n%d sec left",
+                     cwCount, ccwCount, pressCount, (int)((10000 - (millis() - startTime)) / 1000));
+            displayTestRunning("Right Encoder", msg);
+        }
+        lastSW = sw;
+
+        delay(1);  // Small delay for stability
+    }
+
+    bool passed = (cwCount > 0 || ccwCount > 0 || pressCount > 0);
+    char details[100];
+    snprintf(details, sizeof(details), "CW:%d CCW:%d Press:%d", cwCount, ccwCount, pressCount);
+    displayTestResult("Right Encoder", passed, details);
+    waitForButtonPress();
+}
+
+/**
+ * Run emergency stop test
+ */
+void runEmergencyStopTest() {
+    displayTestRunning("Emergency Stop", "Press BOTH encoder\nbuttons and hold\n0.5 seconds\n\n15 seconds...");
+
+    unsigned long startTime = millis();
+    unsigned long bothPressedStart = 0;
+    bool triggered = false;
+
+    while (millis() - startTime < 15000 && !triggered) {
+        int leftSW = digitalRead(ENCODER_LEFT_SW_PIN);
+        int rightSW = digitalRead(ENCODER_RIGHT_SW_PIN);
+
+        if (leftSW == LOW && rightSW == LOW) {
+            if (bothPressedStart == 0) {
+                bothPressedStart = millis();
+                displayTestRunning("Emergency Stop", "HOLDING...\nKeep holding!");
+            }
+
+            if (millis() - bothPressedStart >= 500) {
+                triggered = true;
+                playTone(2000, 1000);
+            }
+        } else {
+            bothPressedStart = 0;
+            char msg[100];
+            snprintf(msg, sizeof(msg), "Press BOTH encoder\nbuttons and hold\n0.5 seconds\n\n%d sec left",
+                     (int)((15000 - (millis() - startTime)) / 1000));
+            displayTestRunning("Emergency Stop", msg);
+        }
+
+        delay(10);
+    }
+
+    displayTestResult("Emergency Stop", triggered, triggered ? "E-stop activated!" : "Not triggered");
+    waitForButtonPress();
+}
+
+/**
+ * Run SSR test
+ */
+void runSSRTest() {
+    displayTestRunning("SSR Output", "WARNING:\nDO NOT connect\nto kiln!\n\nPulsing 3 times...");
+    delay(2000);
+
+    for (int i = 0; i < 3; i++) {
+        digitalWrite(SSR_PIN, HIGH);
+        char msg[100];
+        snprintf(msg, sizeof(msg), "Pulse %d: ON\n\nCheck GPIO 25\nwith multimeter", i + 1);
+        displayTestRunning("SSR Output", msg, false);
+        delay(500);
+
+        digitalWrite(SSR_PIN, LOW);
+        delay(500);
+    }
+
+    displayTestResult("SSR Output", true, "3 pulses sent");
+    waitForButtonPress();
+}
+
+/**
+ * Run thermocouple test
+ */
+void runThermocoupleTest() {
+    Serial.println("\n========================================");
+    Serial.println("[TEST] Starting Thermocouple Test");
+    Serial.println("========================================");
+
+    int goodSamples = 0;
+    int errorSamples = 0;
+    double minTemp = 9999, maxTemp = -9999;
+    double totalTemp = 0;
+    double currentTemp = 0;
+
+    unsigned long lastRead = 0;
+    bool rightPressed = false;
+    unsigned long rightPressTime = 0;
+    bool exitTest = false;
+
+    Serial.println("[INFO] Reading thermocouple every 500ms...");
+    Serial.println("[INFO] To exit: Press RIGHT button, then LEFT button within 3 seconds");
+    Serial.println();
+    Serial.println("*** IMPORTANT: If temperature goes DOWN when heated, swap thermocouple wires! ***");
+    Serial.println("    K-Type: YELLOW wire = NEGATIVE (-), RED wire = POSITIVE (+)");
+    Serial.println();
+
+    while (!exitTest) {
+        // Read temperature every 500ms
+        if (millis() - lastRead >= 500) {
+            lastRead = millis();
+            double tempC = thermocouple.readCelsius();
+
+            Serial.printf("[DEBUG] Raw reading: %.1f°C, isnan=%d, valid range: %.1f to %.1f\n",
+                          tempC, isnan(tempC), MIN_VALID_TEMP, MAX_VALID_TEMP);
+
+            if (!isnan(tempC) && tempC > MIN_VALID_TEMP && tempC < MAX_VALID_TEMP) {
+                // Convert to Fahrenheit
+                currentTemp = (tempC * 9.0 / 5.0) + 32.0;
+
+                goodSamples++;
+                totalTemp += currentTemp;
+                if (currentTemp < minTemp) minTemp = currentTemp;
+                if (currentTemp > maxTemp) maxTemp = currentTemp;
+
+                // Print to serial
+                Serial.printf("[TEMP] %.1f°F (%.1f°C) | Min: %.1f°F, Max: %.1f°F, Avg: %.1f°F | Good: %d Errors: %d\n",
+                              currentTemp, tempC, minTemp, maxTemp, totalTemp / goodSamples,
+                              goodSamples, errorSamples);
+            } else {
+                errorSamples++;
+                currentTemp = -999;  // Error indicator
+                Serial.printf("[ERROR] Bad reading! (NaN or out of range) - Errors: %d\n", errorSamples);
+            }
+
+            Serial.println("[DEBUG] About to update TFT display...");
+
+            // Update display ONLY when we have new temperature data
+            Serial.println("[DEBUG] Clearing TFT screen...");
+            tft.fillScreen(TFT_BLACK);
+
+            Serial.println("[DEBUG] Drawing header...");
+            tft.setTextSize(2);
+            tft.setTextColor(TFT_CYAN, TFT_BLACK);
+            tft.setCursor(10, 10);
+            tft.println("Thermocouple");
+            tft.drawLine(0, 35, 240, 35, TFT_WHITE);
+
+            // Current reading - LARGE
+            Serial.printf("[DEBUG] Drawing temperature: %.1f°F\n", currentTemp);
+            tft.setTextSize(5);
+            if (currentTemp == -999) {
+                tft.setTextColor(TFT_RED, TFT_BLACK);
+                tft.setCursor(10, 60);
+                tft.print("ERROR");
+            } else {
+                tft.setTextColor(TFT_WHITE, TFT_BLACK);
+                tft.setCursor(10, 60);
+                char tempStr[20];
+                snprintf(tempStr, sizeof(tempStr), "%.1f", currentTemp);
+                tft.print(tempStr);
+                tft.setTextSize(3);
+                tft.print("F");
+            }
+            Serial.println("[DEBUG] Temperature drawn.");
+
+            // Statistics
+            tft.setTextSize(1);
+            tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+            tft.setCursor(10, 140);
+            tft.print("Min: ");
+            if (minTemp < 9999) {
+                tft.printf("%.1f F", minTemp);
+            } else {
+                tft.print("---");
+            }
+
+            tft.setCursor(10, 160);
+            tft.print("Max: ");
+            if (maxTemp > -9999) {
+                tft.printf("%.1f F", maxTemp);
+            } else {
+                tft.print("---");
+            }
+
+            if (goodSamples > 0) {
+                double avgTemp = totalTemp / goodSamples;
+                tft.setCursor(10, 180);
+                tft.print("Avg: ");
+                tft.printf("%.1f F", avgTemp);
+            }
+
+            tft.setTextColor(TFT_GREEN, TFT_BLACK);
+            tft.setCursor(10, 210);
+            tft.printf("Good: %d  Errors: %d", goodSamples, errorSamples);
+
+            // Exit instructions
+            tft.drawLine(0, 240, 240, 240, TFT_DARKGREY);
+            tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+            tft.setCursor(10, 250);
+            tft.println("To exit:");
+            tft.setCursor(10, 265);
+            if (rightPressed) {
+                tft.setTextColor(TFT_GREEN, TFT_BLACK);
+                tft.println("Now press LEFT!");
+            } else {
+                tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+                tft.println("1. Press RIGHT");
+                tft.setCursor(10, 280);
+                tft.println("2. Press LEFT");
+            }
+
+            Serial.println("[DEBUG] TFT display update complete!");
+            Serial.println();
+        }  // End of temperature reading and display update block
+
+        // Check for exit sequence
+        int rightSW = digitalRead(ENCODER_RIGHT_SW_PIN);
+        int leftSW = digitalRead(ENCODER_LEFT_SW_PIN);
+
+        // Step 1: Press right button
+        if (!rightPressed && rightSW == LOW) {
+            rightPressed = true;
+            rightPressTime = millis();
+            playTone(1500, 50);
+        }
+
+        // Step 2: Press left button within 3 seconds
+        if (rightPressed) {
+            if (leftSW == LOW) {
+                exitTest = true;
+                playTone(2000, 100);
+            }
+
+            // Timeout after 3 seconds
+            if (millis() - rightPressTime > 3000) {
+                rightPressed = false;
+            }
+        }
+
+        delay(50);
+    }
+
+    // Show final results
+    bool passed = (goodSamples > 5 && errorSamples == 0);
+    char details[100];
+    if (goodSamples > 0) {
+        double avgTemp = totalTemp / goodSamples;
+        snprintf(details, sizeof(details), "Avg: %.1fC\nRange: %.1f-%.1fC\nGood: %d Errors: %d",
+                 avgTemp, minTemp, maxTemp, goodSamples, errorSamples);
+    } else {
+        snprintf(details, sizeof(details), "No valid readings!");
+    }
+
+    displayTestResult("Thermocouple", passed, details);
+    waitForButtonPress();
+}
+
+/**
+ * Run display test
+ */
+void runDisplayTest() {
+    // Colors
+    tft.fillScreen(TFT_RED);
+    delay(500);
+    tft.fillScreen(TFT_GREEN);
+    delay(500);
+    tft.fillScreen(TFT_BLUE);
+    delay(500);
+
+    // Graphics
+    tft.fillScreen(TFT_BLACK);
+    tft.drawRect(20, 20, 200, 280, TFT_WHITE);
+    tft.fillCircle(120, 160, 50, TFT_YELLOW);
+    tft.drawLine(20, 20, 220, 300, TFT_RED);
+    tft.drawLine(220, 20, 20, 300, TFT_GREEN);
+    delay(2000);
+
+    displayTestResult("TFT Display", true, "Colors & graphics\ndisplayed");
+    waitForButtonPress();
+}
+
+/**
+ * Handle test mode navigation
+ */
+void handleTestModeInput() {
+    int clk = digitalRead(ENCODER_LEFT_CLK_PIN);
+    static int lastCLK = HIGH;
+
+    // Navigate menu - only on FALLING edge to prevent double-counting
+    if (clk != lastCLK && clk == LOW && !testState.testRunning) {
+        int dt = digitalRead(ENCODER_LEFT_DT_PIN);
+        if (dt == LOW) {
+            // Clockwise - down
+            testState.menuSelection++;
+            if (testState.menuSelection >= numTestMenuItems) {
+                testState.menuSelection = 0;
+            }
+        } else {
+            // Counter-clockwise - up
+            testState.menuSelection--;
+            if (testState.menuSelection < 0) {
+                testState.menuSelection = numTestMenuItems - 1;
+            }
+        }
+        displayTestMenu();
+        playTone(1200, 20);
+    }
+    lastCLK = clk;
+
+    // Select menu item
+    int sw = digitalRead(ENCODER_LEFT_SW_PIN);
+    static int lastSW = HIGH;
+    static unsigned long lastPress = 0;
+
+    if (sw != lastSW && sw == LOW && !testState.testRunning) {
+        if (millis() - lastPress > 200) {
+            lastPress = millis();
+            playTone(2000, 50);
+
+            // Execute selected test
+            switch (testState.menuSelection) {
+                case 0: // Run all tests
+                    runLEDTest();
+                    runBuzzerTest();
+                    runLeftEncoderTest();
+                    runRightEncoderTest();
+                    runEmergencyStopTest();
+                    runSSRTest();
+                    runThermocoupleTest();
+                    runDisplayTest();
+                    displayTestMenu();
+                    break;
+                case 1: runLEDTest(); displayTestMenu(); break;
+                case 2: runBuzzerTest(); displayTestMenu(); break;
+                case 3: runLeftEncoderTest(); displayTestMenu(); break;
+                case 4: runRightEncoderTest(); displayTestMenu(); break;
+                case 5: runEmergencyStopTest(); displayTestMenu(); break;
+                case 6: runSSRTest(); displayTestMenu(); break;
+                case 7: runThermocoupleTest(); displayTestMenu(); break;
+                case 8: runDisplayTest(); displayTestMenu(); break;
+                case 9: // Exit
+                    state.mode = MODE_IDLE;
+                    break;
+            }
+        }
+    }
+    lastSW = sw;
+}
+
+// ============================================================================
 // DISPLAY FUNCTIONS
 // ============================================================================
 
 /**
- * Update LCD with current system state
+ * Update TFT display with current system state
  */
 void updateDisplay() {
-    display.clearBuffer();
+    // Clear screen
+    tft.fillScreen(TFT_BLACK);
 
     // Header - Show current mode
-    display.setFont(u8g2_font_ncenB08_tr);
+    tft.setTextSize(2);
+    tft.setCursor(10, 10);
     if (state.mode == MODE_IDLE) {
-        display.drawStr(0, 10, "IDLE");
+        tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+        tft.print("IDLE");
     } else {
-        display.drawStr(0, 10, "MANUAL");
+        tft.setTextColor(TFT_GREEN, TFT_BLACK);
+        tft.print("MANUAL");
     }
 
     // Heating indicator
     if (state.heating) {
-        display.drawStr(90, 10, "HEATING");
+        tft.setTextColor(TFT_RED, TFT_BLACK);
+        tft.setCursor(130, 10);
+        tft.print("HEAT");
     }
 
-    display.drawLine(0, 12, 127, 12);
+    tft.drawLine(0, 35, 240, 35, TFT_WHITE);
 
     // Current Temperature (large)
-    display.setFont(u8g2_font_ncenB14_tr);
+    tft.setTextSize(6);
     char tempStr[20];
     if (state.sensorError) {
-        snprintf(tempStr, sizeof(tempStr), "ERROR!");
+        tft.setTextColor(TFT_RED, TFT_BLACK);
+        tft.setCursor(10, 60);
+        tft.setTextSize(3);
+        tft.print("SENSOR ERROR!");
     } else {
+        tft.setTextColor(TFT_WHITE, TFT_BLACK);
+        tft.setCursor(10, 60);
         snprintf(tempStr, sizeof(tempStr), "%.1f", state.currentTemp);
-    }
-    display.drawStr(5, 32, tempStr);
+        tft.print(tempStr);
 
-    // Degree symbol and C
-    display.setFont(u8g2_font_ncenB08_tr);
-    if (!state.sensorError) {
-        display.drawCircle(85, 25, 3);
-        display.drawStr(90, 32, "C");
+        // Degree symbol and C
+        tft.setTextSize(3);
+        tft.drawCircle(210, 70, 8, TFT_WHITE);
+        tft.setCursor(205, 90);
+        tft.print("C");
     }
 
     // Target Temperature
-    display.setFont(u8g2_font_6x10_tr);
-    display.drawStr(5, 45, "Target:");
+    tft.drawLine(0, 150, 240, 150, TFT_DARKGREY);
+    tft.setTextSize(2);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(10, 165);
+    tft.print("Target: ");
     snprintf(tempStr, sizeof(tempStr), "%.0f", state.targetTemp);
-    display.drawStr(45, 45, tempStr);
-    display.drawCircle(85, 39, 2);
-    display.drawStr(88, 45, "C");
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.print(tempStr);
+    tft.drawCircle(210, 172, 5, TFT_WHITE);
+    tft.print("C");
 
     // Instructions
-    display.drawLine(0, 48, 127, 48);
-    display.setFont(u8g2_font_6x10_tr);
-    display.drawStr(0, 58, "L:Mode R:Setpoint");
-
-    display.sendBuffer();
+    tft.drawLine(0, 250, 240, 250, TFT_DARKGREY);
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_GREENYELLOW, TFT_BLACK);
+    tft.setCursor(10, 265);
+    tft.print("L: Mode");
+    tft.setCursor(10, 280);
+    tft.print("R: Setpoint");
+    tft.setCursor(10, 295);
+    tft.setTextColor(TFT_ORANGE, TFT_BLACK);
+    tft.print("Both: Emergency Stop");
 }
 
 // ============================================================================
@@ -423,43 +1160,60 @@ void setup() {
 
     Serial.println("[OK] GPIO pins initialized");
 
-    // NOTE: Both MAX31855 and LCD are using SOFTWARE SPI (bit-banging)
-    // Hardware SPI.begin() is not needed since each device controls its own pins
-    // If we later switch to hardware SPI, uncomment and configure:
-    // SPI.begin(LCD_SCK_PIN, THERMOCOUPLE_MISO_PIN, LCD_MOSI_PIN, -1);
-    Serial.println("[INFO] Using software SPI for all devices");
+    // Initialize test state
+    initTestState();
+
+    // Initialize SPI for shared bus (MAX31855 thermocouple uses software SPI)
+    SPI.begin();
+    Serial.println("[INFO] SPI bus initialized");
 
     // Initialize thermocouple (software SPI)
     delay(500);  // Give MAX31855 time to stabilize
     Serial.println("[OK] MAX31855 thermocouple initialized (software SPI)");
 
-    // Initialize LCD display
-    display.begin();
-    display.clearBuffer();
-    display.setFont(u8g2_font_ncenB10_tr);
-    display.drawStr(10, 30, "Kiln Controller");
-    display.setFont(u8g2_font_6x10_tr);
-    display.drawStr(20, 45, "Initializing...");
-    display.sendBuffer();
-    Serial.println("[OK] LCD display initialized");
+    // Initialize TFT display
+    tft.init();
+    tft.setRotation(0);  // Portrait mode
+    tft.fillScreen(TFT_BLACK);
+    tft.setTextColor(TFT_WHITE, TFT_BLACK);
+    tft.setTextSize(3);
+    tft.setCursor(20, 80);
+    tft.println("Kiln");
+    tft.setCursor(20, 120);
+    tft.println("Controller");
+    tft.setTextSize(1);
+    tft.setTextColor(TFT_CYAN, TFT_BLACK);
+    tft.setCursor(10, 180);
+    tft.println("Initializing...");
+
+    // Show hardware test mode message
+    tft.setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft.setCursor(10, 220);
+    tft.println("HARDWARE TEST MODE");
+
+    Serial.println("[OK] TFT display initialized");
 
     delay(2000);  // Show splash screen
 
-    // Startup beep sequence
-    playTone(1000, 100);
-    delay(50);
-    playTone(1500, 100);
+    // ALWAYS enter hardware test mode
+    Serial.println();
+    Serial.println("========================================");
+    Serial.println("HARDWARE TEST MODE");
+    Serial.println("========================================");
+    Serial.println();
 
+    state.mode = MODE_TEST;
+    playTone(1500, 200);
+    delay(100);
+    playTone(2000, 200);
+
+    Serial.println("[MODE] Entering HARDWARE TEST mode");
     Serial.println();
-    Serial.println("========================================");
-    Serial.println("System Ready");
-    Serial.println("========================================");
+    Serial.println("Use LEFT encoder to navigate menu");
+    Serial.println("Press LEFT encoder button to select test");
     Serial.println();
-    Serial.println("Controls:");
-    Serial.println("  Left Encoder:  Toggle IDLE/MANUAL mode");
-    Serial.println("  Right Encoder: Adjust target temperature");
-    Serial.println("  Both Buttons:  Emergency stop (hold 0.5s)");
-    Serial.println();
+
+    displayTestMenu();
 
     state.lastTempRead = millis();
     state.lastDisplayUpdate = millis();
@@ -471,6 +1225,15 @@ void setup() {
 
 void loop() {
     unsigned long now = millis();
+
+    // Handle test mode
+    if (state.mode == MODE_TEST) {
+        handleTestModeInput();
+        delay(10);
+        return;
+    }
+
+    // Normal operation mode (IDLE or MANUAL)
 
     // Read temperature (every 100ms)
     if (now - state.lastTempRead >= 100) {

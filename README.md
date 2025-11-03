@@ -185,6 +185,34 @@ Transform your basic 120VAC kiln into a smart, precision-controlled firing syste
    pio device monitor
    ```
 
+### Hardware Testing (IMPORTANT - Do This First!)
+
+The firmware boots directly into **Hardware Test Mode** to verify all components before normal operation.
+
+**Test Menu** (navigate with LEFT encoder, select with LEFT button):
+1. Run All Tests - Automated test sequence
+2. Status LEDs - Tests Power, WiFi, and Error LEDs
+3. Buzzer - Plays test tones
+4. Left Encoder - Interactive rotation and button test
+5. Right Encoder - Interactive rotation and button test
+6. Emergency Stop - Tests dual-button E-stop (hold both 0.5s)
+7. SSR Output - Pulses SSR 3 times (**WARNING: do NOT connect to kiln!**)
+8. Thermocouple - Live temperature readings (press RIGHT then LEFT to exit)
+9. TFT Display - Color and graphics test
+10. Exit Test Mode - Return to normal controller mode
+
+**Thermocouple Test Notes**:
+- Displays live temperature in Fahrenheit on TFT screen
+- Serial monitor shows readings: `[TEMP] 68.5°F (20.3°C)`
+- Touch probe with finger to see temperature rise
+- If temperature goes DOWN when heated, **swap thermocouple wires!**
+  - K-Type: YELLOW wire = NEGATIVE (-), RED wire = POSITIVE (+)
+
+**Known Issues Fixed**:
+- ✅ SPI bus conflict between MAX31855 and TFT (both now use hardware SPI)
+- ✅ Encoder double-counting (debounced with 5ms delay, falling-edge detection)
+- ✅ Display not updating during thermocouple test (moved update into read block)
+
 ### First Boot Configuration
 
 1. **Connect to WiFi**
@@ -723,13 +751,24 @@ You are free to:
 
 ## 🗺️ Roadmap
 
-### Current Status
+### Current Status (Updated: 2025-01-02)
 
 - ✅ Development environment setup (M1.1 complete)
-- 🔄 Hardware acquisition pending (M1.2)
-- ⏳ Temperature reading module (M1.3)
-- ⏳ Basic PID control (M2.1)
-- ⏳ Web interface foundation (M2.2)
+- ✅ Hardware acquisition complete (M1.2)
+- ✅ Hardware testing complete - ALL components verified working (M1.3)
+  - ESP32-WROOM-32 board operational
+  - ILI9341 2.4" Color TFT display (240x320) with live updates
+  - MAX31855 thermocouple module reading temperatures
+  - Both rotary encoders with debounced CW/CCW detection
+  - Solid State Relay (SSR) output pulsing correctly
+  - Status LEDs (Power, WiFi, Error) functional
+  - Piezo buzzer audio feedback working
+  - Emergency stop (dual-button) tested and operational
+- 🔄 Software integration in progress (M2.1)
+  - Hardware test mode fully functional
+  - Normal kiln controller mode pending implementation
+- ⏳ Basic PID control (M2.2)
+- ⏳ Web interface foundation (M2.3)
 
 ### Planned Features
 

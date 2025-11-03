@@ -17,7 +17,7 @@
 #include "config.h"
 #include <SPI.h>
 #include <Adafruit_MAX31855.h>
-#include <U8g2lib.h>
+#include <TFT_eSPI.h>
 
 // ============================================================================
 // TEST CONFIGURATION
@@ -32,8 +32,8 @@
 // Track if auto-run has completed
 bool autoRunComplete = false;
 
-// Global LCD object (initialized in setup)
-U8G2_ST7920_128X64_F_SW_SPI* display = nullptr;
+// Global TFT object (initialized in setup)
+TFT_eSPI* tft = nullptr;
 
 // Buzzer LEDC configuration (ESP32-native)
 #define BUZZER_CHANNEL 0
@@ -56,43 +56,47 @@ void playTone(uint32_t frequency, uint32_t duration) {
 }
 
 // ============================================================================
-// LCD HELPER FUNCTIONS
+// TFT HELPER FUNCTIONS
 // ============================================================================
 
 /**
- * Clear LCD and show test header
+ * Clear TFT and show test header
  */
 void lcd_showTestHeader(const char* testName, int testNum) {
-    if (!display) return;
+    if (!tft) return;
 
-    display->clearBuffer();
-    display->setFont(u8g2_font_ncenB08_tr);
+    tft->fillScreen(TFT_BLACK);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
 
     // Header
+    tft->setTextSize(2);
     char header[32];
     snprintf(header, sizeof(header), "TEST %d", testNum);
-    display->drawStr(0, 10, header);
+    tft->setCursor(10, 10);
+    tft->println(header);
 
     // Test name
-    display->setFont(u8g2_font_6x10_tr);
-    display->drawStr(0, 22, testName);
-    display->drawLine(0, 24, 127, 24);
-
-    display->sendBuffer();
+    tft->setTextSize(1);
+    tft->setCursor(10, 35);
+    tft->println(testName);
+    tft->drawLine(0, 50, 240, 50, TFT_WHITE);
 }
 
 /**
- * Add a line to the LCD (max 4 lines after header)
+ * Add a line to the TFT (max 10 lines after header)
  */
 void lcd_println(const char* text, int lineNum) {
-    if (!display) return;
+    if (!tft) return;
 
-    display->setFont(u8g2_font_6x10_tr);
-    int yPos = 26 + (lineNum * 12);
+    tft->setTextSize(1);
+    tft->setTextColor(TFT_CYAN, TFT_BLACK);
+    int yPos = 60 + (lineNum * 20);
 
-    if (yPos <= 64) {
-        display->drawStr(0, yPos, text);
-        display->sendBuffer();
+    if (yPos <= 300) {
+        tft->setCursor(10, yPos);
+        // Clear the line first
+        tft->fillRect(10, yPos, 220, 16, TFT_BLACK);
+        tft->print(text);
     }
 }
 
@@ -100,27 +104,24 @@ void lcd_println(const char* text, int lineNum) {
  * Show status message (PASS/FAIL/etc)
  */
 void lcd_showStatus(const char* status, bool isPass) {
-    if (!display) return;
-
-    display->setFont(u8g2_font_ncenB08_tr);
+    if (!tft) return;
 
     // Clear bottom area
-    display->setDrawColor(0);
-    display->drawBox(0, 50, 128, 14);
-    display->setDrawColor(1);
+    tft->fillRect(0, 280, 240, 40, TFT_BLACK);
 
-    // Draw status
-    int x = (128 - (strlen(status) * 8)) / 2;  // Center text
-    display->drawStr(x, 62, status);
-    display->sendBuffer();
+    // Draw status with color
+    tft->setTextSize(2);
+    tft->setTextColor(isPass ? TFT_GREEN : TFT_RED, TFT_BLACK);
+    int x = (240 - (strlen(status) * 12)) / 2;  // Center text
+    tft->setCursor(x, 290);
+    tft->print(status);
 }
 
 /**
- * Update display with current output
+ * Update display (no-op for TFT, kept for compatibility)
  */
 void lcd_update() {
-    if (!display) return;
-    display->sendBuffer();
+    // TFT updates immediately, no buffer to flush
 }
 
 // ============================================================================
@@ -630,71 +631,100 @@ void test_thermocouple() {
 }
 
 /**
- * Test 9: ST7920 LCD Display
+ * Test 9: ILI9341 TFT Display
  */
 void test_display() {
-    Serial.println("\n[TEST 9] ST7920 LCD Display");
+    Serial.println("\n[TEST 9] ILI9341 TFT Display");
     Serial.println("----------------------------------------");
 
-    Serial.println("  Initializing display...");
-
-    // Initialize display using software SPI
-    U8G2_ST7920_128X64_F_SW_SPI u8g2(U8G2_R0, LCD_SCK, LCD_MOSI, LCD_CS);
-    u8g2.begin();
+    if (!tft) {
+        Serial.println("  ERROR: TFT not initialized!");
+        return;
+    }
 
     Serial.println("  Drawing test pattern...");
 
     // Test 1: Text display
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB10_tr);
-    u8g2.drawStr(5, 15, "Kiln Controller");
-    u8g2.setFont(u8g2_font_ncenB08_tr);
-    u8g2.drawStr(15, 30, "Hardware Test");
-    u8g2.drawStr(20, 45, "Display OK!");
-    u8g2.sendBuffer();
+    tft->fillScreen(TFT_BLACK);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextSize(3);
+    tft->setCursor(20, 40);
+    tft->println("Kiln");
+    tft->setCursor(20, 80);
+    tft->println("Controller");
+    tft->setTextSize(2);
+    tft->setCursor(30, 140);
+    tft->setTextColor(TFT_CYAN, TFT_BLACK);
+    tft->println("Hardware Test");
+    tft->setTextColor(TFT_GREEN, TFT_BLACK);
+    tft->setCursor(40, 180);
+    tft->println("Display OK!");
 
     Serial.println("  Test 1: Text displayed");
-    delay(2000);
+    delay(3000);
 
     // Test 2: Graphics
-    u8g2.clearBuffer();
-    u8g2.drawFrame(0, 0, 128, 64);  // Border
-    u8g2.drawBox(10, 10, 20, 20);   // Filled box
-    u8g2.drawCircle(64, 32, 15);    // Circle
-    u8g2.drawLine(90, 10, 110, 50); // Line
-    u8g2.sendBuffer();
+    tft->fillScreen(TFT_BLACK);
+    tft->drawRect(10, 10, 220, 300, TFT_WHITE);      // Border
+    tft->fillRect(30, 30, 60, 60, TFT_RED);          // Red filled box
+    tft->fillCircle(120, 160, 40, TFT_BLUE);         // Blue circle
+    tft->drawLine(160, 30, 210, 100, TFT_GREEN);     // Green line
+    tft->fillTriangle(180, 200, 210, 280, 150, 280, TFT_YELLOW); // Yellow triangle
 
     Serial.println("  Test 2: Graphics displayed");
-    delay(2000);
+    delay(3000);
 
-    // Test 3: Temperature-like display
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB14_tr);
-    u8g2.drawStr(10, 25, "TEMP:");
-    u8g2.drawStr(30, 50, "23.5");
-    u8g2.setFont(u8g2_font_ncenB08_tr);
-    u8g2.drawStr(90, 50, "C");
-    u8g2.drawCircle(85, 43, 3);  // Degree symbol
-    u8g2.sendBuffer();
+    // Test 3: Color gradient
+    tft->fillScreen(TFT_BLACK);
+    for (int y = 0; y < 320; y += 10) {
+        uint16_t color = tft->color565(y * 255 / 320, 128, 255 - (y * 255 / 320));
+        tft->fillRect(0, y, 240, 10, color);
+    }
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextSize(3);
+    tft->setCursor(30, 140);
+    tft->println("COLOR TEST");
 
-    Serial.println("  Test 3: Temperature display");
-    delay(2000);
+    Serial.println("  Test 3: Color gradient displayed");
+    delay(3000);
+
+    // Test 4: Temperature-like display
+    tft->fillScreen(TFT_BLACK);
+    tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft->setTextSize(2);
+    tft->setCursor(40, 60);
+    tft->println("CURRENT TEMP:");
+
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextSize(5);
+    tft->setCursor(50, 140);
+    tft->print("23.5");
+    tft->setTextSize(3);
+    tft->print("C");
+    tft->drawCircle(185, 145, 8, TFT_WHITE);  // Degree symbol
+
+    Serial.println("  Test 4: Temperature display");
+    delay(3000);
 
     // Final message
-    u8g2.clearBuffer();
-    u8g2.setFont(u8g2_font_ncenB10_tr);
-    u8g2.drawStr(15, 30, "TEST COMPLETE");
-    u8g2.sendBuffer();
+    tft->fillScreen(TFT_DARKGREEN);
+    tft->setTextColor(TFT_WHITE, TFT_DARKGREEN);
+    tft->setTextSize(3);
+    tft->setCursor(30, 140);
+    tft->println("TEST");
+    tft->setCursor(30, 180);
+    tft->println("COMPLETE!");
 
     Serial.println();
-    Serial.println("  RESULT: Check LCD for 4 screens:");
+    Serial.println("  RESULT: Check TFT for 5 screens:");
     Serial.println("    1. Text: 'Kiln Controller...'");
-    Serial.println("    2. Graphics: box, circle, line");
-    Serial.println("    3. Temperature: '23.5°C'");
-    Serial.println("    4. 'TEST COMPLETE'");
+    Serial.println("    2. Graphics: shapes in different colors");
+    Serial.println("    3. Color gradient test");
+    Serial.println("    4. Temperature: '23.5°C'");
+    Serial.println("    5. 'TEST COMPLETE'");
     Serial.println();
-    Serial.println("  If blank: Check CS(15), MOSI(23), SCK(18), 5V, GND");
-    Serial.println("  If garbled: Adjust contrast pot on back of LCD");
+    Serial.println("  If blank: Check CS(15), DC(2), MOSI(23), SCK(18), RST(4), power");
+    Serial.println("  If colors wrong: Check TFT_eSPI configuration in platformio.ini");
 }
 
 /**
@@ -777,15 +807,23 @@ void run_auto_tests() {
     Serial.println("  ALL TESTS COMPLETE");
     Serial.println("========================================");
 
-    // Show completion on LCD
-    display->clearBuffer();
-    display->setFont(u8g2_font_ncenB10_tr);
-    display->drawStr(5, 20, "TESTS COMPLETE");
-    display->setFont(u8g2_font_6x10_tr);
-    display->drawStr(5, 35, "Standalone mode:");
-    display->drawStr(5, 47, "Unplug USB and");
-    display->drawStr(5, 59, "power with 5V");
-    display->sendBuffer();
+    // Show completion on TFT
+    tft->fillScreen(TFT_DARKGREEN);
+    tft->setTextColor(TFT_WHITE, TFT_DARKGREEN);
+    tft->setTextSize(3);
+    tft->setCursor(10, 50);
+    tft->println("TESTS");
+    tft->setCursor(10, 90);
+    tft->println("COMPLETE!");
+
+    tft->setTextSize(2);
+    tft->setTextColor(TFT_YELLOW, TFT_DARKGREEN);
+    tft->setCursor(10, 160);
+    tft->println("Standalone mode:");
+    tft->setCursor(10, 190);
+    tft->println("Unplug USB and");
+    tft->setCursor(10, 220);
+    tft->println("power with 5V");
     delay(3000);
 }
 
@@ -812,17 +850,28 @@ void print_menu() {
     Serial.println("  Send number (0-9) to run test");
     Serial.println("========================================");
 
-    // Show menu on LCD
-    display->clearBuffer();
-    display->setFont(u8g2_font_ncenB08_tr);
-    display->drawStr(15, 10, "TEST MENU");
-    display->drawLine(0, 12, 127, 12);
-    display->setFont(u8g2_font_6x10_tr);
-    display->drawStr(0, 24, "USB: Send 0-9");
-    display->drawStr(0, 36, "0:All tests");
-    display->drawStr(0, 48, "1-7:Components");
-    display->drawStr(0, 60, "8:TC  9:LCD");
-    display->sendBuffer();
+    // Show menu on TFT
+    tft->fillScreen(TFT_NAVY);
+    tft->setTextColor(TFT_WHITE, TFT_NAVY);
+    tft->setTextSize(3);
+    tft->setCursor(30, 30);
+    tft->println("TEST MENU");
+    tft->drawLine(0, 70, 240, 70, TFT_WHITE);
+
+    tft->setTextSize(2);
+    tft->setTextColor(TFT_CYAN, TFT_NAVY);
+    tft->setCursor(10, 90);
+    tft->println("USB: Send 0-9");
+
+    tft->setTextColor(TFT_WHITE, TFT_NAVY);
+    tft->setCursor(10, 130);
+    tft->println("0: All tests");
+    tft->setCursor(10, 160);
+    tft->println("1-7: Components");
+    tft->setCursor(10, 190);
+    tft->println("8: Thermocouple");
+    tft->setCursor(10, 220);
+    tft->println("9: TFT Display");
 }
 
 // ============================================================================
@@ -878,20 +927,24 @@ void setup() {
     Serial.println("[OK] All GPIO pins initialized");
     Serial.println();
 
-    // Initialize LCD display
-    Serial.println("[INIT] Initializing LCD display...");
-    display = new U8G2_ST7920_128X64_F_SW_SPI(U8G2_R0, LCD_SCK, LCD_MOSI, LCD_CS);
-    display->begin();
+    // Initialize TFT display
+    Serial.println("[INIT] Initializing TFT display...");
+    tft = new TFT_eSPI();
+    tft->init();
+    tft->setRotation(0);  // Portrait mode (0 or 2), change to 1 or 3 for landscape
 
     // Show startup screen
-    display->clearBuffer();
-    display->setFont(u8g2_font_ncenB10_tr);
-    display->drawStr(10, 20, "KILN TEST");
-    display->setFont(u8g2_font_6x10_tr);
-    display->drawStr(15, 40, "Initializing...");
-    display->sendBuffer();
+    tft->fillScreen(TFT_BLACK);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setTextSize(3);
+    tft->setCursor(20, 100);
+    tft->println("KILN TEST");
+    tft->setTextSize(2);
+    tft->setTextColor(TFT_CYAN, TFT_BLACK);
+    tft->setCursor(20, 160);
+    tft->println("Initializing...");
 
-    Serial.println("[OK] LCD display ready");
+    Serial.println("[OK] TFT display ready");
     Serial.println();
 
 #if AUTO_RUN_ON_STARTUP
@@ -901,15 +954,22 @@ void setup() {
     Serial.println("      (Send any character to skip to menu)");
     Serial.println();
 
-    // Show on LCD too
-    display->clearBuffer();
-    display->setFont(u8g2_font_ncenB10_tr);
-    display->drawStr(10, 20, "AUTO-RUN");
-    display->setFont(u8g2_font_6x10_tr);
-    display->drawStr(5, 35, "Starting in 3s");
-    display->drawStr(5, 50, "USB: Send char");
-    display->drawStr(5, 62, "to cancel");
-    display->sendBuffer();
+    // Show on TFT too
+    tft->fillScreen(TFT_BLACK);
+    tft->setTextColor(TFT_YELLOW, TFT_BLACK);
+    tft->setTextSize(3);
+    tft->setCursor(30, 80);
+    tft->println("AUTO-RUN");
+
+    tft->setTextSize(2);
+    tft->setTextColor(TFT_WHITE, TFT_BLACK);
+    tft->setCursor(20, 140);
+    tft->println("Starting in 3s");
+    tft->setCursor(20, 170);
+    tft->setTextColor(TFT_CYAN, TFT_BLACK);
+    tft->println("USB: Send char");
+    tft->setCursor(20, 200);
+    tft->println("to cancel");
 
     // Visual indicator that new firmware is loaded - rapid blink
     for (int i = 0; i < 6; i++) {
